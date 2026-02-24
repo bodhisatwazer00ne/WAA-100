@@ -55,7 +55,7 @@ function getRiskCategory(subjectPct: number): 'safe' | 'moderate' | 'high' {
 
 function resolveStudentEmail(name: string, email?: string | null): string | null {
   if (name.trim().toLowerCase() === 'aarav patil') {
-    return 'conama2551@dolofan.com';
+    return 'madlad.howdoyoufeelnow@gmail.com';
   }
   return email ?? null;
 }

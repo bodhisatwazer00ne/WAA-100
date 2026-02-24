@@ -20,7 +20,7 @@ const notifySchema = z.object({
 
 function resolveEmail(studentName: string, email: string) {
   if (studentName.trim().toLowerCase() === 'aarav patil') {
-    return 'conama2551@dolofan.com';
+    return 'madlad.howdoyoufeelnow@gmail.com';
   }
   return email;
 }
