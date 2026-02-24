@@ -1,97 +1,101 @@
-## WAA-100 – Web-based Academic Attendance 100% Monitoring System
+# WAA-100 - Web-based Academic Attendance Monitoring
 
-WAA-100 is a full-stack academic attendance monitoring platform with role-based dashboards for **Teacher**, **Class Teacher**, **HOD**, and **Student**. It provides fine-grained attendance capture, risk analytics, PDF reporting, and email notifications.
+WAA-100 is a full-stack attendance platform with role-based dashboards for **HOD**, **Teacher**, and **Student**, including attendance marking, date/range analytics, defaulter views, PDF exports, and absence email alerts.
 
-### Tech Stack
+## Tech Stack
 
 - **Frontend**: Vite + React + TypeScript + shadcn-ui + Tailwind CSS
 - **Backend**: Node.js + Express (TypeScript)
 - **Database**: PostgreSQL + Prisma ORM
-- **Auth**: JWT (email + password, bcrypt hashing)
+- **Auth**: JWT + bcrypt
 - **Scheduling**: node-cron
-- **PDF**: pdfkit
 - **Email**: Nodemailer (SMTP)
+- **PDF**:
+  - Frontend table/matrix PDFs via `src/lib/pdf.ts`
+  - Backend PDF endpoint (`src/server/routes/reportRoutes.ts`) uses `pdfkit`
 
-### Prerequisites
+## Prerequisites
 
 - Node.js 18+
-- PostgreSQL running locally (or a DATABASE_URL you control)
+- PostgreSQL (local or managed, e.g. Neon)
 
-### 1. Environment setup
+## Local Setup
 
-1. Copy the example env file:
+### 1) Environment
 
-```sh
-cp .env.example .env
-```
+Create `.env` from `.env.example` and fill required values:
 
-2. Edit `.env` and update:
+- `DATABASE_URL`
+- `JWT_SECRET`
+- SMTP values if you want real email delivery
 
-- `DATABASE_URL` to point at your Postgres instance
-- `JWT_SECRET` to a strong random value
-- SMTP fields if you want real emails (optional in development)
-
-### 2. Install dependencies
+### 2) Install
 
 ```sh
 npm install
 ```
 
-### Deployment (Render + Neon)
-
-Use the production deployment guide:
-
-- [DEPLOY_RENDER_NEON.md](./DEPLOY_RENDER_NEON.md)
-
-Important frontend env (build-time):
-
-- `VITE_API_BASE_URL=https://<your-backend-service>.onrender.com`
-
-### 3. Database migration & seed
+### 3) Prisma
 
 ```sh
 npx prisma migrate dev --name init
 npx prisma generate
+```
+
+Optional seed:
+
+```sh
 npx ts-node prisma/seed.ts
 ```
 
-This creates the schema and seeds demo users:
+Use the currently maintained credentials in `LOGIN_CREDENTIALS.md`.
 
-- HOD: `rajesh@university.edu` / `password123`
-- Class Teacher: `anita@university.edu` / `password123`
-- Teacher: `priya@university.edu` / `password123`
-- Students: `student1@student.edu` … `student30@student.edu` / `password123`
+### 4) Run app
 
-### 4. Run backend and frontend
-
-In one terminal:
+Backend:
 
 ```sh
 npm run server:dev
 ```
 
-In another terminal:
+Frontend:
 
 ```sh
 npm run dev
 ```
 
-- Backend: `http://localhost:4000`
-- Frontend: `http://localhost:5173`
+Default URLs:
 
-Or run both together:
+- Backend: `http://localhost:4000`
+- Frontend: `http://localhost:8080` (from `vite.config.ts`)
+
+If you prefer `5173`:
 
 ```sh
-npm run start:fullstack
+npm run dev -- --host 127.0.0.1 --port 5173
 ```
 
-### 5. High-level architecture
+## Deployment (Render + Neon)
 
-- `prisma/schema.prisma`: database schema (users, departments, classes, subjects, attendance_records, merged_class_reports, analytics_cache, audit_logs, notifications, etc.)
-- `src/server/index.ts`: Express app bootstrap and route registration
-- `src/server/routes/*`: REST APIs for auth, attendance, analytics, notifications, reports, recovery simulator
-- `src/server/services/*`: business logic, email sending, domain services
-- `src/server/analytics/analyticsEngine.ts`: analytics computation and caching
-- `src/server/cron/jobs.ts`: daily merged reports + weekly analytics recomputation
+Use:
 
-The React frontend (under `src/`) provides dashboards and flows for all roles and consumes the REST API.
+- [DEPLOY_RENDER_NEON.md](./DEPLOY_RENDER_NEON.md)
+
+Important frontend build-time env:
+
+- `VITE_API_BASE_URL=https://<your-backend-service>.onrender.com`
+
+## Notes on Data Behavior
+
+- Backend APIs persist data in PostgreSQL via Prisma.
+- Some frontend pages use local mock data and browser localStorage (`src/data/mockData.ts`) for runtime/demo flows.
+
+## Key Project Structure
+
+- `prisma/schema.prisma`: DB schema
+- `src/server/index.ts`: backend bootstrap
+- `src/server/routes/*`: auth, attendance, analytics, notifications, reports, recovery, public mail routes
+- `src/server/services/*`: auth, attendance, email services
+- `src/server/cron/jobs.ts`: scheduled jobs
+- `src/pages/*`: role-based dashboard and workflow pages
+- `src/lib/pdf.ts`: frontend PDF generation utilities
