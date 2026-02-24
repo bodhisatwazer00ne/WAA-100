@@ -75,20 +75,6 @@ If you prefer `5173`:
 npm run dev -- --host 127.0.0.1 --port 5173
 ```
 
-## Deployment (Render + Neon)
-
-Use:
-
-- [DEPLOY_RENDER_NEON.md](./DEPLOY_RENDER_NEON.md)
-
-Important frontend build-time env:
-
-- `VITE_API_BASE_URL=https://<your-backend-service>.onrender.com`
-
-## Notes on Data Behavior
-
-- Backend APIs persist data in PostgreSQL via Prisma.
-- Some frontend pages use local mock data and browser localStorage (`src/data/mockData.ts`) for runtime/demo flows.
 
 ## Key Project Structure
 
