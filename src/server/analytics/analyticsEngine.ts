@@ -1,4 +1,4 @@
-import { prisma } from '../db/client';
+import { prisma } from '../db/client.js';
 
 export async function recomputeStudentAnalytics(studentId: string) {
   const records = await prisma.attendanceRecord.findMany({
@@ -151,4 +151,5 @@ export async function recomputeAllStudentsAnalytics() {
     await recomputeStudentAnalytics(s.id);
   }
 }
+
 

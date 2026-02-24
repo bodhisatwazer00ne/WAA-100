@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { authMiddleware } from '../middleware/auth';
-import { prisma } from '../db/client';
+import { authMiddleware } from '../middleware/auth.js';
+import { prisma } from '../db/client.js';
 
 const router = Router();
 
@@ -87,4 +87,5 @@ router.get('/department/summary', async (_req, res) => {
 });
 
 export default router;
+
 

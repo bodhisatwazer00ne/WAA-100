@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { validateUserCredentials, generateToken } from '../services/authService';
-import { prisma } from '../db/client';
+import { validateUserCredentials, generateToken } from '../services/authService.js';
+import { prisma } from '../db/client.js';
 
 const router = Router();
 
@@ -44,4 +44,5 @@ router.post('/login', async (req, res) => {
 });
 
 export default router;
+
 

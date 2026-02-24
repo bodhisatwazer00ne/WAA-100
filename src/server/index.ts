@@ -1,16 +1,16 @@
 import express from 'express';
 import cors from 'cors';
-import { env } from './config/env';
-import { notFoundHandler, errorHandler } from './middleware/errorHandler';
-import authRoutes from './routes/authRoutes';
-import attendanceRoutes from './routes/attendanceRoutes';
-import analyticsRoutes from './routes/analyticsRoutes';
-import notificationRoutes from './routes/notificationRoutes';
-import reportRoutes from './routes/reportRoutes';
-import recoveryRoutes from './routes/recoveryRoutes';
-import publicRoutes from './routes/publicRoutes';
-import { startCronJobs } from './cron/jobs';
-import { verifySmtpConnection } from './services/emailService';
+import { env } from './config/env.js';
+import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
+import authRoutes from './routes/authRoutes.js';
+import attendanceRoutes from './routes/attendanceRoutes.js';
+import analyticsRoutes from './routes/analyticsRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
+import reportRoutes from './routes/reportRoutes.js';
+import recoveryRoutes from './routes/recoveryRoutes.js';
+import publicRoutes from './routes/publicRoutes.js';
+import { startCronJobs } from './cron/jobs.js';
+import { verifySmtpConnection } from './services/emailService.js';
 
 const app = express();
 
@@ -48,3 +48,4 @@ app.listen(env.port, () => {
   });
   startCronJobs();
 });
+

@@ -1,5 +1,5 @@
 import nodemailer from 'nodemailer';
-import { env } from '../config/env';
+import { env } from '../config/env.js';
 
 const hasUrl = !!env.smtp.url;
 const hasService = !!env.smtp.service;
@@ -60,3 +60,4 @@ export async function verifySmtpConnection() {
     return { ok: false as const, reason: String(error) };
   }
 }
+

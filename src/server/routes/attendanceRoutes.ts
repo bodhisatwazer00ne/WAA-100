@@ -1,14 +1,14 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { authMiddleware } from '../middleware/auth';
+import { authMiddleware } from '../middleware/auth.js';
 import {
   getTeacherSubjects,
   getTeacherClassesForSubject,
   getStudentsByClass,
   hasAttendanceForDate,
   markAttendance,
-} from '../services/attendanceService';
-import { recomputeStudentAnalytics } from '../analytics/analyticsEngine';
+} from '../services/attendanceService.js';
+import { recomputeStudentAnalytics } from '../analytics/analyticsEngine.js';
 
 const router = Router();
 
@@ -100,3 +100,4 @@ router.post('/attendance/mark', async (req, res) => {
 });
 
 export default router;
+

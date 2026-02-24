@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { authMiddleware, requireRole } from '../middleware/auth';
-import { prisma } from '../db/client';
+import { authMiddleware, requireRole } from '../middleware/auth.js';
+import { prisma } from '../db/client.js';
 import PDFDocument from 'pdfkit';
 
 const router = Router();
@@ -102,4 +102,5 @@ router.get('/class/:classId/merged/:reportId/pdf', async (req, res) => {
 });
 
 export default router;
+
 

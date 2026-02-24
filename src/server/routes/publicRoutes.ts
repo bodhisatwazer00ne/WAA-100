@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { sendEmail } from '../services/emailService';
+import { sendEmail } from '../services/emailService.js';
 
 const router = Router();
 
@@ -87,3 +87,4 @@ router.post('/test-email', async (req, res) => {
 });
 
 export default router;
+
