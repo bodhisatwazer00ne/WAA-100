@@ -16,8 +16,22 @@ services:
         value: 7d
       - key: APP_BASE_URL
         sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM
+        sync: false
+      - key: RESEND_API_BASE_URL
+        value: https://api.resend.com
+      - key: SMTP_URL
+        sync: false
       - key: SMTP_SERVICE
-        value: gmail
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_SECURE
+        sync: false
       - key: SMTP_USER
         sync: false
       - key: SMTP_PASS
@@ -25,7 +39,7 @@ services:
       - key: SMTP_FROM
         sync: false
       - key: SMTP_REQUIRE_TLS
-        value: "true"
+        sync: false
 
   - type: static_site
     name: waa-100-frontend

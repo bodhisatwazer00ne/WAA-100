@@ -5,7 +5,7 @@ This guide deploys:
 - Frontend: Render Static Site
 - Backend: Render Web Service
 - Database: Neon Postgres
-- Email: Gmail SMTP
+- Email: Resend (HTTP API, recommended on Render Free)
 
 ## 1) Prepare Neon Postgres
 
@@ -36,16 +36,14 @@ Set backend environment variables:
 - `JWT_SECRET=<strong_random_secret>`
 - `JWT_EXPIRES_IN=7d`
 - `APP_BASE_URL=https://<your-frontend-service>.onrender.com`
-- `SMTP_SERVICE=gmail`
-- `SMTP_USER=<your-gmail-address>`
-- `SMTP_PASS=<gmail-app-password>`
-- `SMTP_FROM=WAA-100 <<your-gmail-address>>`
-- `SMTP_REQUIRE_TLS=true`
-- Leave `SMTP_URL` and `SMTP_HOST` empty when using Gmail service
+- `RESEND_API_KEY=<your_resend_api_key>`
+- `RESEND_FROM=WAA-100 <your-verified-sender@yourdomain.com>`
+- `RESEND_API_BASE_URL=https://api.resend.com`
 
 Notes:
 
 - Backend port is automatically read from Render `PORT`.
+- On Render Free, SMTP ports are blocked, so use Resend HTTP API.
 - Health endpoint:
 
 ```txt
@@ -95,13 +93,13 @@ Ensure backend `APP_BASE_URL` is exactly the deployed frontend URL.
    - HOD defaulter list
 5. Email flow works:
    - Mark Aarav Patil absent
-   - Verify email is sent to `conama2551@dolofan.com`
+   - Verify email is sent to `madlad.howdoyoufeelnow@gmail.com`
 
-## 6) Optional SMTP smoke test
+## 6) Email API smoke test
 
 ```sh
 curl -X POST "https://<your-backend-service>.onrender.com/api/public/test-email" ^
   -H "Content-Type: application/json" ^
-  -d "{\"to\":\"conama2551@dolofan.com\"}"
+  -d "{\"to\":\"madlad.howdoyoufeelnow@gmail.com\"}"
 ```
 

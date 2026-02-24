@@ -10,7 +10,7 @@ import reportRoutes from './routes/reportRoutes.js';
 import recoveryRoutes from './routes/recoveryRoutes.js';
 import publicRoutes from './routes/publicRoutes.js';
 import { startCronJobs } from './cron/jobs.js';
-import { verifySmtpConnection } from './services/emailService.js';
+import { verifyEmailConnection } from './services/emailService.js';
 
 const app = express();
 
@@ -39,11 +39,11 @@ app.use(errorHandler);
 
 app.listen(env.port, () => {
   console.log(`WAA-100 backend listening on port ${env.port}`);
-  verifySmtpConnection().then((result) => {
+  verifyEmailConnection().then((result) => {
     if (result.ok) {
-      console.log('SMTP connection verified');
+      console.log(`Email provider ready (${result.provider})${result.detail ? `: ${result.detail}` : ''}`);
     } else {
-      console.warn(`SMTP not ready: ${result.reason}`);
+      console.warn(`Email provider not ready (${result.provider}): ${result.reason}`);
     }
   });
   startCronJobs();

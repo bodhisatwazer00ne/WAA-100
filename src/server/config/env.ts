@@ -5,6 +5,11 @@ export const env = {
   jwtSecret: process.env.JWT_SECRET ?? 'dev-secret',
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '7d',
   appBaseUrl: process.env.APP_BASE_URL ?? 'http://localhost:5173',
+  resend: {
+    apiKey: process.env.RESEND_API_KEY ?? '',
+    from: process.env.RESEND_FROM ?? '',
+    apiBaseUrl: process.env.RESEND_API_BASE_URL ?? 'https://api.resend.com',
+  },
   smtp: {
     url: process.env.SMTP_URL ?? '',
     service: process.env.SMTP_SERVICE ?? '',

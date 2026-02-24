@@ -1,12 +1,28 @@
-# SMTP Setup (Nodemailer)
+# Email Setup (Resend Preferred)
 
-WAA-100 now sends absence emails using Nodemailer through SMTP.
+WAA-100 now supports:
 
-## 1) Configure `.env`
+- Resend HTTP API (recommended for Render Free)
+- SMTP via Nodemailer (fallback if Resend key is not set)
 
-Choose one method.
+## 1) Recommended: Resend
 
-### Method A: SMTP service + user/pass (easy for Gmail)
+Set these backend env vars:
+
+```env
+RESEND_API_KEY="re_xxxxxxxxx"
+RESEND_FROM="WAA-100 <onboarding@resend.dev>"
+RESEND_API_BASE_URL="https://api.resend.com"
+```
+
+Notes:
+
+- `RESEND_FROM` must be allowed by your Resend account.
+- For production, verify your own domain sender in Resend.
+
+## 2) Optional fallback: SMTP
+
+Use SMTP only when `RESEND_API_KEY` is empty.
 
 ```env
 SMTP_SERVICE="gmail"
@@ -16,41 +32,24 @@ SMTP_FROM="WAA-100 <yourgmail@gmail.com>"
 SMTP_REQUIRE_TLS="true"
 ```
 
-### Method B: SMTP host/port
+## 3) Backend startup log
 
-```env
-SMTP_HOST="smtp-relay.brevo.com"
-SMTP_PORT="587"
-SMTP_SECURE="false"
-SMTP_USER="your-smtp-login"
-SMTP_PASS="your-smtp-key"
-SMTP_FROM="WAA-100 <your-verified-sender@domain.com>"
-SMTP_REQUIRE_TLS="true"
-```
+On backend start, look for:
 
-### Method C: SMTP URL
+- `Email provider ready (resend): ...`
+- or `Email provider ready (smtp): ...`
+- otherwise `Email provider not ready (...)`
 
-```env
-SMTP_URL="smtps://user:pass@smtp.example.com:465"
-SMTP_FROM="WAA-100 <no-reply@yourdomain.com>"
-```
-
-## 2) Restart backend
-
-When backend starts, it now logs one of:
-
-- `SMTP connection verified`
-- `SMTP not ready: ...`
-
-If you see `SMTP not ready`, email delivery will fail.
-
-## 3) Test email directly
+## 4) Test email
 
 ```powershell
-Invoke-RestMethod -Method POST `
-  -Uri "http://localhost:4000/api/public/test-email" `
-  -ContentType "application/json" `
-  -Body '{"to":"kimika2807@dolofan.com"}'
+curl.exe --http1.1 -sS -X POST "https://<your-backend>.onrender.com/api/public/test-email" `
+  -H "Content-Type: application/json" `
+  --data-raw "{\"to\":\"your-email@example.com\"}"
 ```
 
-If this returns `{ ok: true }`, absence emails will also send.
+Expected success response:
+
+```json
+{ "ok": true, "result": { ... } }
+```
