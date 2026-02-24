@@ -1,0 +1,38 @@
+services:
+  - type: web
+    name: waa-100-backend
+    env: node
+    plan: free
+    rootDir: .
+    buildCommand: npm install && npm run prisma:generate && npm run server:build
+    startCommand: npx prisma migrate deploy && npm run server:start
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: APP_BASE_URL
+        sync: false
+      - key: SMTP_SERVICE
+        value: gmail
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      - key: SMTP_REQUIRE_TLS
+        value: "true"
+
+  - type: static_site
+    name: waa-100-frontend
+    rootDir: .
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        sync: false
+

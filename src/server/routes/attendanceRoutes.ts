@@ -1,0 +1,102 @@
+import { Router } from 'express';
+import { z } from 'zod';
+import { authMiddleware } from '../middleware/auth';
+import {
+  getTeacherSubjects,
+  getTeacherClassesForSubject,
+  getStudentsByClass,
+  hasAttendanceForDate,
+  markAttendance,
+} from '../services/attendanceService';
+import { recomputeStudentAnalytics } from '../analytics/analyticsEngine';
+
+const router = Router();
+
+router.use(authMiddleware);
+
+router.get('/teacher/subjects', async (req, res) => {
+  const userId = req.auth!.userId;
+  const subjects = await getTeacherSubjects(userId);
+  res.json(subjects);
+});
+
+router.get('/teacher/classes', async (req, res) => {
+  const userId = req.auth!.userId;
+  const subjectId = req.query.subjectId as string;
+  if (!subjectId) return res.status(400).json({ error: 'subjectId is required' });
+  const classes = await getTeacherClassesForSubject(userId, subjectId);
+  res.json(classes);
+});
+
+router.get('/classes/:classId/students', async (req, res) => {
+  const students = await getStudentsByClass(req.params.classId);
+  res.json(
+    students.map(s => ({
+      id: s.id,
+      rollNumber: s.rollNumber,
+      name: s.user.name,
+      email: s.user.email,
+    })),
+  );
+});
+
+router.get('/attendance/check', async (req, res) => {
+  const { classId, subjectId, date } = req.query as {
+    classId?: string;
+    subjectId?: string;
+    date?: string;
+  };
+  if (!classId || !subjectId || !date) {
+    return res.status(400).json({ error: 'classId, subjectId and date are required' });
+  }
+  const has = await hasAttendanceForDate(classId, subjectId, new Date(date));
+  res.json({ exists: has });
+});
+
+const markSchema = z.object({
+  classId: z.string(),
+  subjectId: z.string(),
+  date: z.string(),
+  attendance: z
+    .array(
+      z.object({
+        studentId: z.string(),
+        status: z.enum(['present', 'absent']),
+      }),
+    )
+    .min(1),
+});
+
+router.post('/attendance/mark', async (req, res) => {
+  const parse = markSchema.safeParse(req.body);
+  if (!parse.success) {
+    return res.status(400).json({ error: 'Invalid body', details: parse.error.flatten() });
+  }
+  const { classId, subjectId, date, attendance } = parse.data;
+
+  try {
+    const created = await markAttendance({
+      classId,
+      subjectId,
+      teacherUserId: req.auth!.userId,
+      date: new Date(date),
+      attendance: attendance.map(a => ({ studentId: a.studentId, status: a.status })),
+    });
+
+    // recompute analytics for affected students
+    for (const r of created) {
+      // eslint-disable-next-line no-await-in-loop
+      await recomputeStudentAnalytics(r.studentId);
+    }
+
+    res.status(201).json({ count: created.length });
+  } catch (err: any) {
+    if (err instanceof Error && err.message.includes('already recorded')) {
+      return res.status(409).json({ error: err.message });
+    }
+    console.error(err);
+    res.status(500).json({ error: 'Failed to mark attendance' });
+  }
+});
+
+export default router;

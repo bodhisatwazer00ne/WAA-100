@@ -1,0 +1,192 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  teacher
+  class_teacher
+  hod
+  student
+}
+
+model Department {
+  id        String   @id @default(cuid())
+  name      String
+  code      String   @unique
+  hod       User?    @relation("DepartmentHod", fields: [hodId], references: [id])
+  hodId     String?  @unique
+  users     User[]
+  classes   Class[]
+  teachers  Teacher[]
+  students  Student[]
+  subjects  Subject[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model User {
+  id           String    @id @default(cuid())
+  name         String
+  email        String    @unique
+  passwordHash String
+  role         Role
+  department   Department? @relation(fields: [departmentId], references: [id])
+  departmentId String?
+
+  hodDepartment        Department? @relation("DepartmentHod")
+  classesAsClassTeacher Class[]     @relation("ClassTeacher")
+  auditLogsAsActor     AuditLog[]   @relation("AuditActor")
+
+  teacherProfile Teacher?
+  studentProfile Student?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Teacher {
+  id           String      @id @default(cuid())
+  user         User        @relation(fields: [userId], references: [id])
+  userId       String      @unique
+  department   Department  @relation(fields: [departmentId], references: [id])
+  departmentId String
+
+  classesTaught   TeacherClassSubject[]
+  attendanceTaken AttendanceRecord[]
+}
+
+model Student {
+  id           String      @id @default(cuid())
+  user         User        @relation(fields: [userId], references: [id])
+  userId       String      @unique
+  department   Department  @relation(fields: [departmentId], references: [id])
+  departmentId String
+  class        Class       @relation(fields: [classId], references: [id])
+  classId      String
+  rollNumber   String
+
+  attendanceRecords AttendanceRecord[]
+  notifications     Notification[]
+  analytics         AnalyticsCache[]
+}
+
+model Class {
+  id              String      @id @default(cuid())
+  name            String
+  semester        Int
+  department      Department  @relation(fields: [departmentId], references: [id])
+  departmentId    String
+  classTeacher    User?       @relation("ClassTeacher", fields: [classTeacherId], references: [id])
+  classTeacherId  String?
+
+  students        Student[]
+  teacherMappings TeacherClassSubject[]
+  attendance      AttendanceRecord[]
+  mergedReports   MergedClassReport[]
+}
+
+model Subject {
+  id           String      @id @default(cuid())
+  code         String
+  name         String
+  semester     Int
+  department   Department  @relation(fields: [departmentId], references: [id])
+  departmentId String
+
+  teacherMappings TeacherClassSubject[]
+  attendance      AttendanceRecord[]
+}
+
+/// Mapping of which teacher handles which subject for which class
+model TeacherClassSubject {
+  id         String   @id @default(cuid())
+  teacher    Teacher  @relation(fields: [teacherId], references: [id])
+  teacherId  String
+  subject    Subject  @relation(fields: [subjectId], references: [id])
+  subjectId  String
+  class      Class    @relation(fields: [classId], references: [id])
+  classId    String
+
+  @@unique([teacherId, subjectId, classId])
+}
+
+model AttendanceRecord {
+  id             String   @id @default(cuid())
+  class          Class    @relation(fields: [classId], references: [id])
+  classId        String
+  subject        Subject  @relation(fields: [subjectId], references: [id])
+  subjectId      String
+  teacher        Teacher  @relation(fields: [teacherId], references: [id])
+  teacherId      String
+  student        Student  @relation(fields: [studentId], references: [id])
+  studentId      String
+  attendanceDate DateTime
+  status         String   // "present" | "absent"
+  createdAt      DateTime @default(now())
+  modifiedAt     DateTime @updatedAt
+  overrideReason String?
+
+  overrideLogs AuditLog[]
+
+  @@index([studentId, attendanceDate])
+  @@unique([classId, subjectId, studentId, attendanceDate])
+}
+
+model MergedClassReport {
+  id             String   @id @default(cuid())
+  class          Class    @relation(fields: [classId], references: [id])
+  classId        String
+  reportDate     DateTime
+  totalStudents  Int
+  totalPresent   Int
+  totalAbsent    Int
+  pdfPath        String?
+  createdAt      DateTime @default(now())
+
+  @@unique([classId, reportDate])
+}
+
+model AnalyticsCache {
+  id                 String   @id @default(cuid())
+  student            Student  @relation(fields: [studentId], references: [id])
+  studentId          String
+  overallPct         Float
+  subjectWise        Json
+  rateOfDecline      Float
+  acceleration       Float
+  variance           Float
+  weeklyAvg          Float
+  termAvg            Float
+  riskLevel          String   // "safe" | "moderate" | "high"
+  lastComputedAt     DateTime @default(now())
+
+  @@unique([studentId])
+}
+
+model AuditLog {
+  id                 String           @id @default(cuid())
+  attendanceRecord   AttendanceRecord @relation(fields: [attendanceRecordId], references: [id])
+  attendanceRecordId String
+  actor              User             @relation("AuditActor", fields: [actorUserId], references: [id])
+  actorUserId        String
+  previousStatus     String
+  newStatus          String
+  reason             String
+  createdAt          DateTime @default(now())
+}
+
+model Notification {
+  id            String   @id @default(cuid())
+  student       Student  @relation(fields: [studentId], references: [id])
+  studentId     String
+  type          String   // "absence"
+  message       String
+  meta          Json?
+  createdAt     DateTime @default(now())
+  sentAt        DateTime?
+}
