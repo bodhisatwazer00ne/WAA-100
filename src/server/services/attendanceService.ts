@@ -158,9 +158,12 @@ export async function markAttendance({
     return payloads;
   });
 
-  await Promise.allSettled(
-    emailPayloads.map((p) =>
-      sendEmail({
+  for (const p of emailPayloads) {
+    try {
+      // Send sequentially to avoid provider burst limits.
+      // Retry/backoff for transient failures is handled inside sendEmail().
+      // eslint-disable-next-line no-await-in-loop
+      await sendEmail({
         to: p.to,
         subject: `Absence Alert: ${p.subjectName} (${p.dateText})`,
         text:
@@ -170,9 +173,11 @@ export async function markAttendance({
           `Current attendance in ${p.subjectName}: ${p.subjectPct.toFixed(2)}%.\n\n` +
           `Please ensure regular attendance.\n` +
           `- WAA-100`,
-      }),
-    ),
-  );
+      });
+    } catch (error) {
+      console.warn(`Absence email failed for ${p.to}: ${String(error)}`);
+    }
+  }
 
   return prisma.attendanceRecord.findMany({
     where: { classId, subjectId, attendanceDate: date },

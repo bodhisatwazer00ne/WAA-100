@@ -33,10 +33,13 @@ router.post('/notify-absences', async (req, res) => {
 
   const { absences } = parse.data;
 
-  const results = await Promise.allSettled(
-    absences.map((a) =>
-      sendEmail({
-        to: resolveEmail(a.studentName, a.email),
+  const outcomes: Array<{ ok: boolean; email: string; reason?: string }> = [];
+
+  for (const a of absences) {
+    const targetEmail = resolveEmail(a.studentName, a.email);
+    try {
+      await sendEmail({
+        to: targetEmail,
         subject: `Absence Alert: ${a.subjectName} (${a.date})`,
         text:
           `Dear ${a.studentName},\n\n` +
@@ -45,21 +48,23 @@ router.post('/notify-absences', async (req, res) => {
           `Current attendance in ${a.subjectName}: ${a.subjectPct.toFixed(2)}%.\n\n` +
           `Please ensure regular attendance.\n` +
           `- WAA-100`,
-      }),
-    ),
-  );
+      });
+      outcomes.push({ ok: true, email: targetEmail });
+    } catch (error) {
+      outcomes.push({ ok: false, email: targetEmail, reason: String(error) });
+    }
+  }
 
-  const sent = results.filter(r => r.status === 'fulfilled').length;
-  const failed = results.length - sent;
-  const failures = results
-    .map((r, i) => ({ r, i }))
-    .filter(({ r }) => r.status === 'rejected')
-    .map(({ r, i }) => ({
-      email: resolveEmail(absences[i].studentName, absences[i].email),
-      reason: r.status === 'rejected' ? String(r.reason) : '',
+  const sent = outcomes.filter((o) => o.ok).length;
+  const failed = outcomes.length - sent;
+  const failures = outcomes
+    .filter((o) => !o.ok)
+    .map((o) => ({
+      email: o.email,
+      reason: o.reason ?? 'Unknown send error',
     }));
 
-  res.json({ total: results.length, sent, failed, failures });
+  res.json({ total: outcomes.length, sent, failed, failures });
 });
 
 const testEmailSchema = z.object({
@@ -75,7 +80,7 @@ router.post('/test-email', async (req, res) => {
   try {
     const result = await sendEmail({
       to: parse.data.to,
-      subject: 'WAA-100 SMTP Test Email',
+      subject: 'WAA-100 Email Provider Test',
       text:
         'This is a test email from WAA-100.\n\n' +
         `Sent at: ${new Date().toISOString()}`,

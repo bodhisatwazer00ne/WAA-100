@@ -36,6 +36,40 @@ interface SendEmailOptions {
   html?: string;
 }
 
+const RESEND_MAX_ATTEMPTS = 5;
+const RESEND_BASE_DELAY_MS = 500;
+const RESEND_MAX_DELAY_MS = 20_000;
+
+function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function parseRetryAfterMs(retryAfter: string | null): number | null {
+  if (!retryAfter) return null;
+
+  const asSeconds = Number(retryAfter);
+  if (Number.isFinite(asSeconds) && asSeconds >= 0) {
+    return Math.round(asSeconds * 1000);
+  }
+
+  const asDate = Date.parse(retryAfter);
+  if (!Number.isNaN(asDate)) {
+    const delta = asDate - Date.now();
+    return delta > 0 ? delta : 0;
+  }
+
+  return null;
+}
+
+function getBackoffMs(attempt: number, retryAfterHeader: string | null): number {
+  const retryAfterMs = parseRetryAfterMs(retryAfterHeader);
+  if (retryAfterMs !== null) {
+    return Math.min(RESEND_MAX_DELAY_MS, retryAfterMs);
+  }
+  const exp = RESEND_BASE_DELAY_MS * 2 ** (attempt - 1);
+  return Math.min(RESEND_MAX_DELAY_MS, exp);
+}
+
 async function sendViaResend(options: SendEmailOptions) {
   if (!resendFrom) {
     throw new Error('Resend configured but sender address is missing (set RESEND_FROM)');
@@ -49,33 +83,55 @@ async function sendViaResend(options: SendEmailOptions) {
     ...(options.html ? { html: options.html } : {}),
   };
 
-  const response = await fetch(resendEndpoint, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${env.resend.apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  });
+  for (let attempt = 1; attempt <= RESEND_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      const response = await fetch(resendEndpoint, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${env.resend.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
 
-  const raw = await response.text();
-  if (!response.ok) {
-    throw new Error(`Resend send failed (${response.status}): ${raw}`);
+      const raw = await response.text();
+      if (response.ok) {
+        let parsed: { id?: string } = {};
+        try {
+          parsed = JSON.parse(raw) as { id?: string };
+        } catch {
+          parsed = {};
+        }
+
+        return {
+          messageId: parsed.id ?? '',
+          accepted: [options.to],
+          rejected: [],
+          response: raw,
+        };
+      }
+
+      const retryable = response.status === 429 || response.status >= 500;
+      if (retryable && attempt < RESEND_MAX_ATTEMPTS) {
+        const waitMs = getBackoffMs(attempt, response.headers.get('retry-after'));
+        await sleep(waitMs);
+        continue;
+      }
+
+      throw new Error(
+        `Resend send failed (${response.status}) after ${attempt} attempt(s): ${raw}`,
+      );
+    } catch (error) {
+      if (attempt < RESEND_MAX_ATTEMPTS) {
+        const waitMs = getBackoffMs(attempt, null);
+        await sleep(waitMs);
+        continue;
+      }
+      throw new Error(`Resend request failed after ${attempt} attempt(s): ${String(error)}`);
+    }
   }
 
-  let parsed: { id?: string } = {};
-  try {
-    parsed = JSON.parse(raw) as { id?: string };
-  } catch {
-    parsed = {};
-  }
-
-  return {
-    messageId: parsed.id ?? '',
-    accepted: [options.to],
-    rejected: [],
-    response: raw,
-  };
+  throw new Error('Resend send failed: exhausted retry attempts');
 }
 
 export async function sendEmail(options: SendEmailOptions) {
