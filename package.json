@@ -12,7 +12,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "server:dev": "tsx src/server/index.ts",
-    "server:start": "node dist/server/index.js",
+    "server:start": "node dist/index.js",
     "server:build": "tsc -p tsconfig.server.json",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
