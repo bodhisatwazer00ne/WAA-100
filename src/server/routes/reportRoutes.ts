@@ -2,10 +2,41 @@ import { Router } from 'express';
 import { authMiddleware, requireRole } from '../middleware/auth.js';
 import { prisma } from '../db/client.js';
 import PDFDocument from 'pdfkit';
+import type { Role } from '@prisma/client';
 
 const router = Router();
 
 router.use(authMiddleware);
+
+async function canAccessClass(userId: string, role: Role, classId: string) {
+  if (role === 'hod') return true;
+
+  if (role === 'student') {
+    const student = await prisma.student.findUnique({ where: { userId } });
+    return !!student && student.classId === classId;
+  }
+
+  const classAsTeacher = await prisma.class.findFirst({
+    where: {
+      id: classId,
+      classTeacherId: userId,
+    },
+    select: { id: true },
+  });
+  if (classAsTeacher) return true;
+
+  const teacher = await prisma.teacher.findUnique({ where: { userId } });
+  if (!teacher) return false;
+
+  const mapping = await prisma.teacherClassSubject.findFirst({
+    where: {
+      teacherId: teacher.id,
+      classId,
+    },
+    select: { id: true },
+  });
+  return !!mapping;
+}
 
 function dateOnly(input: string) {
   return new Date(`${input}T00:00:00.000Z`);
@@ -29,6 +60,21 @@ function toRisk(pct: number): 'safe' | 'moderate' | 'high' {
 
 router.get('/student/:studentId', async (req, res) => {
   const { studentId } = req.params;
+  const role = req.auth!.role;
+  const userId = req.auth!.userId;
+
+  if (role === 'student') {
+    const self = await prisma.student.findUnique({ where: { userId } });
+    if (!self || self.id !== studentId) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+  } else if (role === 'teacher' || role === 'class_teacher') {
+    const studentProfile = await prisma.student.findUnique({ where: { id: studentId } });
+    if (!studentProfile) return res.status(404).send('Student not found');
+    const allowed = await canAccessClass(userId, role, studentProfile.classId);
+    if (!allowed) return res.status(403).json({ error: 'Forbidden' });
+  }
+
   const student = await prisma.student.findUnique({
     where: { id: studentId },
     include: { user: true, class: true },
@@ -81,6 +127,9 @@ router.get(
   requireRole('teacher', 'class_teacher', 'hod'),
   async (req, res) => {
     const { classId } = req.params;
+    const allowed = await canAccessClass(req.auth!.userId, req.auth!.role, classId);
+    if (!allowed) return res.status(403).json({ error: 'Forbidden' });
+
     const reports = await prisma.mergedClassReport.findMany({
       where: { classId },
       orderBy: { reportDate: 'desc' },
@@ -397,13 +446,15 @@ router.get('/faculty-mapping', requireRole('hod'), async (_req, res) => {
   return res.json(rows);
 });
 
-router.get('/class/:classId/merged/:reportId/pdf', async (req, res) => {
+router.get('/class/:classId/merged/:reportId/pdf', requireRole('teacher', 'class_teacher', 'hod'), async (req, res) => {
   const { reportId } = req.params;
   const report = await prisma.mergedClassReport.findUnique({
     where: { id: reportId },
     include: { class: true },
   });
   if (!report) return res.status(404).send('Report not found');
+  const allowed = await canAccessClass(req.auth!.userId, req.auth!.role, report.classId);
+  if (!allowed) return res.status(403).json({ error: 'Forbidden' });
 
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader(

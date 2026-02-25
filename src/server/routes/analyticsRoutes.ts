@@ -1,21 +1,97 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middleware/auth.js';
 import { prisma } from '../db/client.js';
+import type { Role } from '@prisma/client';
 
 const router = Router();
 
 router.use(authMiddleware);
 
-router.get('/classes', async (_req, res) => {
-  const rows = await prisma.class.findMany({
-    select: { id: true, name: true, semester: true },
-    orderBy: { name: 'asc' },
+async function canAccessClass(userId: string, role: Role, classId: string) {
+  if (role === 'hod') return true;
+
+  if (role === 'student') {
+    const student = await prisma.student.findUnique({ where: { userId } });
+    return !!student && student.classId === classId;
+  }
+
+  const classAsTeacher = await prisma.class.findFirst({
+    where: {
+      id: classId,
+      classTeacherId: userId,
+    },
+    select: { id: true },
   });
+  if (classAsTeacher) return true;
+
+  const teacher = await prisma.teacher.findUnique({ where: { userId } });
+  if (!teacher) return false;
+
+  const mapping = await prisma.teacherClassSubject.findFirst({
+    where: {
+      teacherId: teacher.id,
+      classId,
+    },
+    select: { id: true },
+  });
+  return !!mapping;
+}
+
+router.get('/classes', async (req, res) => {
+  const role = req.auth!.role;
+  const userId = req.auth!.userId;
+
+  if (role === 'student') {
+    const student = await prisma.student.findUnique({
+      where: { userId },
+      include: { class: true },
+    });
+    const rows = student
+      ? [{ id: student.class.id, name: student.class.name, semester: student.class.semester }]
+      : [];
+    return res.json(rows);
+  }
+
+  if (role === 'hod') {
+    const rows = await prisma.class.findMany({
+      select: { id: true, name: true, semester: true },
+      orderBy: { name: 'asc' },
+    });
+    return res.json(rows);
+  }
+
+  const teacher = await prisma.teacher.findUnique({ where: { userId } });
+  if (!teacher) return res.json([]);
+
+  const mappings = await prisma.teacherClassSubject.findMany({
+    where: { teacherId: teacher.id },
+    include: { class: true },
+  });
+  const rows = Array.from(
+    new Map(mappings.map(mapping => [mapping.class.id, mapping.class])).values(),
+  )
+    .map(classRow => ({ id: classRow.id, name: classRow.name, semester: classRow.semester }))
+    .sort((a, b) => a.name.localeCompare(b.name));
   res.json(rows);
 });
 
 router.get('/student/:studentId', async (req, res) => {
   const { studentId } = req.params;
+  const role = req.auth!.role;
+  const userId = req.auth!.userId;
+
+  if (role === 'student') {
+    const self = await prisma.student.findUnique({ where: { userId } });
+    if (!self || self.id !== studentId) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+  } else if (role === 'teacher' || role === 'class_teacher') {
+    const student = await prisma.student.findUnique({ where: { id: studentId } });
+    if (!student) return res.status(404).json({ error: 'Student not found' });
+    const access = await canAccessClass(userId, role, student.classId);
+    if (!access) return res.status(403).json({ error: 'Forbidden' });
+  }
+
   const cache = await prisma.analyticsCache.findUnique({ where: { studentId } });
   if (!cache) return res.status(404).json({ error: 'Analytics not found' });
   res.json(cache);
@@ -23,6 +99,9 @@ router.get('/student/:studentId', async (req, res) => {
 
 router.get('/class/:classId', async (req, res) => {
   const { classId } = req.params;
+  const allowed = await canAccessClass(req.auth!.userId, req.auth!.role, classId);
+  if (!allowed) return res.status(403).json({ error: 'Forbidden' });
+
   const students = await prisma.student.findMany({
     where: { classId },
     include: { user: true, analytics: true },
@@ -41,6 +120,13 @@ router.get('/class/:classId', async (req, res) => {
 
 router.get('/risk-distribution', async (req, res) => {
   const { classId } = req.query as { classId?: string };
+  if (classId) {
+    const allowed = await canAccessClass(req.auth!.userId, req.auth!.role, classId);
+    if (!allowed) return res.status(403).json({ error: 'Forbidden' });
+  } else if (req.auth!.role !== 'hod') {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
   const students = await prisma.student.findMany({
     where: classId ? { classId } : {},
     include: { analytics: true },
@@ -57,7 +143,11 @@ router.get('/risk-distribution', async (req, res) => {
   res.json({ safe, moderate, high, total: students.length });
 });
 
-router.get('/department/summary', async (_req, res) => {
+router.get('/department/summary', async (req, res) => {
+  if (req.auth!.role !== 'hod') {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
   const classes = await prisma.class.findMany({
     include: {
       students: {
@@ -94,7 +184,11 @@ router.get('/department/summary', async (_req, res) => {
   res.json(classSummary);
 });
 
-router.get('/department/subject-performance', async (_req, res) => {
+router.get('/department/subject-performance', async (req, res) => {
+  if (req.auth!.role !== 'hod') {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
   const subjects = await prisma.subject.findMany({
     select: { id: true, code: true, name: true },
     orderBy: { code: 'asc' },
