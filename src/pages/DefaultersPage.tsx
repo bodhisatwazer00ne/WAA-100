@@ -1,57 +1,103 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { students, classes, subjects, attendanceRecords, teacherMappings } from '@/data/mockData';
+import { apiRequest } from '@/lib/api';
 import { RiskBadge } from '@/components/RiskBadge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 
+interface TeacherSubject {
+  id: string;
+  code: string;
+  name: string;
+}
+
+interface TeacherClass {
+  id: string;
+  name: string;
+}
+
+interface DefaulterRow {
+  studentId: string;
+  rollNumber: string;
+  studentName: string;
+  total: number;
+  present: number;
+  pct: number;
+}
+
+interface DefaultersResponse {
+  class: { id: string; name: string } | null;
+  subject: { id: string; code: string; name: string } | null;
+  defaulters: DefaulterRow[];
+}
+
 export default function DefaultersPage() {
   const { user } = useAuth();
   if (!user) return null;
 
-  const teacherSubjectIds = [...new Set(teacherMappings.filter(m => m.teacher_id === user.id).map(m => m.subject_id))];
-  const teacherSubjects = subjects.filter(s => teacherSubjectIds.includes(s.id));
+  const [subjects, setSubjects] = useState<TeacherSubject[]>([]);
+  const [classes, setClasses] = useState<TeacherClass[]>([]);
+  const [selectedSubject, setSelectedSubject] = useState('');
+  const [selectedClass, setSelectedClass] = useState('');
+  const [data, setData] = useState<DefaultersResponse | null>(null);
 
-  const [selectedSubject, setSelectedSubject] = useState<string>(teacherSubjects[0]?.id || '');
+  useEffect(() => {
+    void (async () => {
+      try {
+        const subjectRows = await apiRequest<TeacherSubject[]>('/api/teacher/subjects');
+        setSubjects(subjectRows);
+        if (subjectRows.length > 0) setSelectedSubject(subjectRows[0].id);
+      } catch {
+        setSubjects([]);
+      }
+    })();
+  }, []);
 
-  const classOptions = useMemo(() => {
-    if (!selectedSubject) return [];
-    const classIds = teacherMappings
-      .filter(m => m.teacher_id === user.id && m.subject_id === selectedSubject)
-      .map(m => m.class_id);
-    return classes.filter(c => classIds.includes(c.id));
-  }, [user.id, selectedSubject]);
-
-  const [selectedClass, setSelectedClass] = useState<string>('');
-
-  const effectiveClass = selectedClass || classOptions[0]?.id || '';
-
-  const defaulters = useMemo(() => {
-    if (!selectedSubject || !effectiveClass) return [];
-    const classStudents = students.filter(s => s.class_id === effectiveClass);
-
-    return classStudents
-      .map(student => {
-        const records = attendanceRecords.filter(
-          r => r.student_id === student.id && r.class_id === effectiveClass && r.subject_id === selectedSubject,
+  useEffect(() => {
+    if (!selectedSubject) {
+      setClasses([]);
+      setSelectedClass('');
+      return;
+    }
+    void (async () => {
+      try {
+        const classRows = await apiRequest<TeacherClass[]>(
+          `/api/teacher/classes?subjectId=${encodeURIComponent(selectedSubject)}`,
         );
-        const total = records.length;
-        const present = records.filter(r => r.status === 'present').length;
-        const pct = total > 0 ? Math.round((present / total) * 100) : 0;
-        return {
-          student,
-          total,
-          present,
-          pct,
-        };
-      })
-      .filter(d => d.total > 0 && d.pct < 75)
-      .sort((a, b) => a.pct - b.pct);
-  }, [selectedSubject, effectiveClass]);
+        setClasses(classRows);
+        setSelectedClass(classRows[0]?.id ?? '');
+      } catch {
+        setClasses([]);
+        setSelectedClass('');
+      }
+    })();
+  }, [selectedSubject]);
 
-  const selectedClassName = classes.find(c => c.id === effectiveClass)?.name || '-';
-  const selectedSubjectName = subjects.find(s => s.id === selectedSubject)?.name || '-';
+  useEffect(() => {
+    if (!selectedSubject || !selectedClass) {
+      setData(null);
+      return;
+    }
+    void (async () => {
+      try {
+        const response = await apiRequest<DefaultersResponse>(
+          `/api/reports/teacher-defaulters?subjectId=${encodeURIComponent(selectedSubject)}&classId=${encodeURIComponent(selectedClass)}`,
+        );
+        setData(response);
+      } catch {
+        setData({ class: null, subject: null, defaulters: [] });
+      }
+    })();
+  }, [selectedClass, selectedSubject]);
+
+  const selectedSubjectName = useMemo(() => {
+    return subjects.find(subject => subject.id === selectedSubject)?.name ?? '-';
+  }, [selectedSubject, subjects]);
+
+  const selectedClassName = useMemo(() => {
+    return classes.find(classRow => classRow.id === selectedClass)?.name ?? '-';
+  }, [classes, selectedClass]);
 
   return (
     <div>
@@ -72,8 +118,8 @@ export default function DefaultersPage() {
           >
             <SelectTrigger><SelectValue placeholder="Choose subject" /></SelectTrigger>
             <SelectContent>
-              {teacherSubjects.map(s => (
-                <SelectItem key={s.id} value={s.id}>{s.code} - {s.name}</SelectItem>
+              {subjects.map(subject => (
+                <SelectItem key={subject.id} value={subject.id}>{subject.code} - {subject.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -81,11 +127,11 @@ export default function DefaultersPage() {
 
         <div className="space-y-2">
           <Label>Select Class</Label>
-          <Select value={effectiveClass} onValueChange={setSelectedClass} disabled={!selectedSubject}>
+          <Select value={selectedClass} onValueChange={setSelectedClass} disabled={!selectedSubject}>
             <SelectTrigger><SelectValue placeholder="Choose class" /></SelectTrigger>
             <SelectContent>
-              {classOptions.map(c => (
-                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+              {classes.map(classRow => (
+                <SelectItem key={classRow.id} value={classRow.id}>{classRow.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -96,7 +142,7 @@ export default function DefaultersPage() {
         Viewing: <strong>{selectedSubjectName}</strong> in <strong>{selectedClassName}</strong>
       </p>
 
-      {defaulters.length === 0 ? (
+      {!data || data.defaulters.length === 0 ? (
         <p className="text-muted-foreground">No defaulters found for the selected subject and class.</p>
       ) : (
         <Card>
@@ -113,12 +159,12 @@ export default function DefaultersPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {defaulters.map(d => (
-                    <tr key={d.student.id} className="border-b last:border-0">
-                      <td className="p-3 font-mono text-xs">{d.student.roll_number}</td>
-                      <td className="p-3 font-medium">{d.student.name}</td>
-                      <td className="p-3">{d.present}/{d.total}</td>
-                      <td className="p-3 text-danger font-semibold">{d.pct}%</td>
+                  {data.defaulters.map(row => (
+                    <tr key={row.studentId} className="border-b last:border-0">
+                      <td className="p-3 font-mono text-xs">{row.rollNumber}</td>
+                      <td className="p-3 font-medium">{row.studentName}</td>
+                      <td className="p-3">{row.present}/{row.total}</td>
+                      <td className="p-3 text-danger font-semibold">{row.pct}%</td>
                       <td className="p-3"><RiskBadge level="high" /></td>
                     </tr>
                   ))}

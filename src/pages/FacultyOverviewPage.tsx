@@ -1,19 +1,37 @@
-import { users, teacherMappings, subjects, classes, attendanceRecords } from '@/data/mockData';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useEffect, useState } from 'react';
+import { apiRequest } from '@/lib/api';
+import { Card, CardContent } from '@/components/ui/card';
+
+interface FacultyRow {
+  teacherId: string;
+  teacherProfileId: string;
+  name: string;
+  email: string;
+  role: string;
+  subjects: string[];
+  classes: string[];
+  classTeacherOf: string[];
+  sessions: number;
+}
 
 export default function FacultyOverviewPage() {
-  const teachers = users.filter(u => u.role === 'teacher');
+  const [rows, setRows] = useState<FacultyRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const facultyData = teachers.map(t => {
-    const mappings = teacherMappings.filter(m => m.teacher_id === t.id);
-    const subjectNames = [...new Set(mappings.map(m => subjects.find(s => s.id === m.subject_id)?.name || ''))];
-    const classNames = [...new Set(mappings.map(m => classes.find(c => c.id === m.class_id)?.name || ''))];
-    const classTeacherOf = classes.filter(c => c.class_teacher_id === t.id).map(c => c.name);
-    const records = attendanceRecords.filter(r => r.teacher_id === t.id);
-    const sessions = new Set(records.map(r => `${r.class_id}-${r.subject_id}-${r.attendance_date}`)).size;
-
-    return { teacher: t, subjects: subjectNames, classes: classNames, classTeacherOf, sessions };
-  });
+  useEffect(() => {
+    void (async () => {
+      try {
+        setLoading(true);
+        const response = await apiRequest<FacultyRow[]>('/api/reports/faculty-mapping');
+        setRows(response);
+      } catch {
+        setError('Failed to load faculty mapping.');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
   return (
     <div>
@@ -22,36 +40,42 @@ export default function FacultyOverviewPage() {
         <p className="page-subtitle">Teacher-subject mapping and class-teacher assignments</p>
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/30">
-                  <th className="p-3 text-left font-medium text-muted-foreground">Faculty</th>
-                  <th className="p-3 text-left font-medium text-muted-foreground">Role</th>
-                  <th className="p-3 text-left font-medium text-muted-foreground">Subjects</th>
-                  <th className="p-3 text-left font-medium text-muted-foreground">Teaching Classes</th>
-                  <th className="p-3 text-left font-medium text-muted-foreground">Class Teacher Of</th>
-                  <th className="p-3 text-left font-medium text-muted-foreground">Sessions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {facultyData.map(f => (
-                  <tr key={f.teacher.id} className="border-b last:border-0">
-                    <td className="p-3 font-medium">{f.teacher.name}</td>
-                    <td className="p-3 text-xs capitalize">{f.teacher.role.replace('_', ' ')}</td>
-                    <td className="p-3 text-xs">{f.subjects.join(', ')}</td>
-                    <td className="p-3 text-xs">{f.classes.join(', ')}</td>
-                    <td className="p-3 text-xs">{f.classTeacherOf.length > 0 ? f.classTeacherOf.join(', ') : '-'}</td>
-                    <td className="p-3 font-semibold">{f.sessions}</td>
+      {loading ? (
+        <p className="text-sm text-muted-foreground">Loading faculty mapping...</p>
+      ) : error ? (
+        <p className="text-sm text-danger">{error}</p>
+      ) : (
+        <Card>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/30">
+                    <th className="p-3 text-left font-medium text-muted-foreground">Faculty</th>
+                    <th className="p-3 text-left font-medium text-muted-foreground">Role</th>
+                    <th className="p-3 text-left font-medium text-muted-foreground">Subjects</th>
+                    <th className="p-3 text-left font-medium text-muted-foreground">Teaching Classes</th>
+                    <th className="p-3 text-left font-medium text-muted-foreground">Class Teacher Of</th>
+                    <th className="p-3 text-left font-medium text-muted-foreground">Sessions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+                </thead>
+                <tbody>
+                  {rows.map(row => (
+                    <tr key={row.teacherId} className="border-b last:border-0">
+                      <td className="p-3 font-medium">{row.name}</td>
+                      <td className="p-3 text-xs capitalize">{row.role.replace('_', ' ')}</td>
+                      <td className="p-3 text-xs">{row.subjects.length > 0 ? row.subjects.join(', ') : '-'}</td>
+                      <td className="p-3 text-xs">{row.classes.length > 0 ? row.classes.join(', ') : '-'}</td>
+                      <td className="p-3 text-xs">{row.classTeacherOf.length > 0 ? row.classTeacherOf.join(', ') : '-'}</td>
+                      <td className="p-3 font-semibold">{row.sessions}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
