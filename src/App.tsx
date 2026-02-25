@@ -20,7 +20,6 @@ import MergedReportsPage from "./pages/MergedReportsPage";
 import DefaultersPage from "./pages/DefaultersPage";
 import FacultyOverviewPage from "./pages/FacultyOverviewPage";
 import OverrideAttendancePage from "./pages/OverrideAttendancePage";
-import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
@@ -40,6 +39,11 @@ function LoginGuard() {
     return <Navigate to="/dashboard" replace />;
   }
   return <LoginPage />;
+}
+
+function FallbackRoute() {
+  const { isAuthenticated } = useAuth();
+  return <Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />;
 }
 
 const App = () => (
@@ -67,7 +71,7 @@ const App = () => (
               <Route path="/recovery" element={<RecoverySimulatorPage />} />
               <Route path="/notifications" element={<NotificationsPage />} />
             </Route>
-            <Route path="*" element={<NotFound />} />
+            <Route path="*" element={<FallbackRoute />} />
           </Routes>
         </BrowserRouter>
       </AuthProvider>
