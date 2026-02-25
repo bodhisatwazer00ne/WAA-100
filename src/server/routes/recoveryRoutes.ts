@@ -9,8 +9,18 @@ router.use(authMiddleware);
 router.get('/student/:studentId', async (req, res) => {
   const { studentId } = req.params;
   const remaining = Number(req.query.remainingClasses ?? 30);
+  const subjectId = (req.query.subjectId as string | undefined)?.trim() || undefined;
 
-  const records = await prisma.attendanceRecord.findMany({ where: { studentId } });
+  if (req.auth!.role === 'student') {
+    const self = await prisma.student.findUnique({ where: { userId: req.auth!.userId } });
+    if (!self || self.id !== studentId) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+  }
+
+  const records = await prisma.attendanceRecord.findMany({
+    where: { studentId, ...(subjectId ? { subjectId } : {}) },
+  });
   const totalConducted = records.length;
   const totalAttended = records.filter(r => r.status === 'present').length;
   const currentPct = totalConducted > 0 ? (totalAttended / totalConducted) * 100 : 100;

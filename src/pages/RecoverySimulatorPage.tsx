@@ -1,43 +1,81 @@
-import { useMemo, useState } from 'react';
-import { students, subjects, attendanceRecords } from '@/data/mockData';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { computeRecovery } from '@/services/attendanceService';
+import { apiRequest } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { TrendingUp, CheckCircle, XCircle } from 'lucide-react';
+import { CheckCircle, XCircle } from 'lucide-react';
+
+interface AttendanceRecordRow {
+  id: string;
+  attendanceDate: string;
+  status: 'present' | 'absent';
+  subjectId: string;
+  subjectName: string;
+  classId: string;
+  className: string;
+}
+
+interface RecoveryResult {
+  totalConducted: number;
+  totalAttended: number;
+  remainingClasses: number;
+  currentPct: number;
+  classesNeededFor75: number;
+  classesNeededFor85: number;
+  canReach75: boolean;
+  canReach85: boolean;
+}
 
 export default function RecoverySimulatorPage() {
   const { user } = useAuth();
-  const student = useMemo(
-    () => students.find(s => s.user_id === user?.id),
-    [user?.id],
-  );
+  const studentId = user?.profile_id;
   const [remaining, setRemaining] = useState(30);
+  const [records, setRecords] = useState<AttendanceRecordRow[]>([]);
+  const [selectedSubjectId, setSelectedSubjectId] = useState('');
+  const [sim, setSim] = useState<RecoveryResult | null>(null);
 
-  if (!student) {
-    return <p className="text-muted-foreground">Student data not found</p>;
-  }
+  useEffect(() => {
+    if (!studentId) return;
+    void (async () => {
+      try {
+        const rows = await apiRequest<AttendanceRecordRow[]>(`/api/attendance/student/${studentId}`);
+        setRecords(rows);
+        const firstSubjectId = rows[0]?.subjectId ?? '';
+        setSelectedSubjectId(firstSubjectId);
+      } catch {
+        setRecords([]);
+      }
+    })();
+  }, [studentId]);
 
-  const enrolledSubjectIds = useMemo(() => {
-    const recs = attendanceRecords.filter(r => r.student_id === student.id);
-    return Array.from(new Set(recs.map(r => r.subject_id)));
-  }, [student.id]);
+  const enrolledSubjects = useMemo(() => {
+    const byId = new Map<string, string>();
+    for (const row of records) byId.set(row.subjectId, row.subjectName);
+    return Array.from(byId.entries()).map(([id, name]) => ({ id, name }));
+  }, [records]);
 
-  const enrolledSubjects = subjects.filter(s => enrolledSubjectIds.includes(s.id));
+  useEffect(() => {
+    if (!studentId || !selectedSubjectId) {
+      setSim(null);
+      return;
+    }
+    void (async () => {
+      try {
+        const response = await apiRequest<RecoveryResult>(
+          `/api/recovery/student/${studentId}?remainingClasses=${encodeURIComponent(String(remaining))}&subjectId=${encodeURIComponent(selectedSubjectId)}`,
+        );
+        setSim(response);
+      } catch {
+        setSim(null);
+      }
+    })();
+  }, [remaining, selectedSubjectId, studentId]);
 
-  if (enrolledSubjects.length === 0) {
-    return <p className="text-muted-foreground">No subject enrolments found for recovery simulation.</p>;
-  }
-
-  const [selectedSubjectId, setSelectedSubjectId] = useState<string>(
-    enrolledSubjects[0]?.id ?? '',
-  );
-
-  const selectedSubject = enrolledSubjects.find(s => s.id === selectedSubjectId) ?? enrolledSubjects[0];
-
-  const sim = computeRecovery(student.id, remaining, selectedSubjectId);
+  if (!studentId) return <p className="text-muted-foreground">Student data not found</p>;
+  if (enrolledSubjects.length === 0) return <p className="text-muted-foreground">No subject enrollments found for recovery simulation.</p>;
+  if (!sim) return <p className="text-muted-foreground">Loading recovery simulation...</p>;
 
   return (
     <div>
@@ -52,17 +90,14 @@ export default function RecoverySimulatorPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>Subject</Label>
-            <Select
-              value={selectedSubjectId}
-              onValueChange={value => setSelectedSubjectId(value)}
-            >
+            <Select value={selectedSubjectId} onValueChange={setSelectedSubjectId}>
               <SelectTrigger>
                 <SelectValue placeholder="Select subject" />
               </SelectTrigger>
               <SelectContent>
-                {enrolledSubjects.map(sub => (
-                  <SelectItem key={sub.id} value={sub.id}>
-                    {sub.name}
+                {enrolledSubjects.map(subject => (
+                  <SelectItem key={subject.id} value={subject.id}>
+                    {subject.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -75,7 +110,7 @@ export default function RecoverySimulatorPage() {
               min={0}
               max={200}
               value={remaining}
-              onChange={e => setRemaining(Number(e.target.value) || 0)}
+              onChange={event => setRemaining(Number(event.target.value) || 0)}
             />
           </div>
         </div>
@@ -120,12 +155,6 @@ export default function RecoverySimulatorPage() {
                   ? `classes needed out of ${remaining} remaining`
                   : `Cannot reach 75% with ${remaining} classes remaining`}
               </p>
-              <div className="mt-3 h-2 bg-muted rounded-full overflow-hidden">
-                <div
-                  className={`h-full rounded-full ${sim.canReach75 ? 'bg-success' : 'bg-danger'}`}
-                  style={{ width: `${sim.canReach75 && remaining > 0 ? Math.min(100, (sim.classesNeededFor75 / remaining) * 100) : 100}%` }}
-                />
-              </div>
             </CardContent>
           </Card>
 
@@ -146,12 +175,6 @@ export default function RecoverySimulatorPage() {
                   ? `classes needed out of ${remaining} remaining`
                   : `Cannot reach 85% with ${remaining} classes remaining`}
               </p>
-              <div className="mt-3 h-2 bg-muted rounded-full overflow-hidden">
-                <div
-                  className={`h-full rounded-full ${sim.canReach85 ? 'bg-success' : 'bg-danger'}`}
-                  style={{ width: `${sim.canReach85 && remaining > 0 ? Math.min(100, (sim.classesNeededFor85 / remaining) * 100) : 100}%` }}
-                />
-              </div>
             </CardContent>
           </Card>
         </div>

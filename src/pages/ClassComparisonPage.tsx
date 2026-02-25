@@ -1,18 +1,39 @@
-import { classes, students, analyticsCache } from '@/data/mockData';
-import { getRiskDistribution } from '@/services/attendanceService';
+import { useEffect, useMemo, useState } from 'react';
+import { apiRequest } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
+interface DepartmentSummaryRow {
+  id: string;
+  name: string;
+  students: number;
+  avgPct: number;
+  safe: number;
+  moderate: number;
+  high: number;
+}
+
 export default function ClassComparisonPage() {
-  const data = classes.map(c => {
-    const risk = getRiskDistribution(c.id);
-    const cStudents = students.filter(s => s.class_id === c.id);
-    const avgPct = cStudents.reduce((sum, s) => {
-      const a = analyticsCache.find(ac => ac.student_id === s.id);
-      return sum + (a?.overall_pct || 0);
-    }, 0) / (cStudents.length || 1);
-    return { name: c.name, avgPct: Math.round(avgPct), safe: risk.safe, moderate: risk.moderate, high: risk.high };
-  });
+  const [rows, setRows] = useState<DepartmentSummaryRow[]>([]);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const data = await apiRequest<DepartmentSummaryRow[]>('/api/analytics/department/summary');
+        setRows(data);
+      } catch {
+        setRows([]);
+      }
+    })();
+  }, []);
+
+  const data = useMemo(() => rows.map(row => ({
+    name: row.name,
+    avgPct: row.avgPct,
+    safe: row.safe,
+    moderate: row.moderate,
+    high: row.high,
+  })), [rows]);
 
   return (
     <div>

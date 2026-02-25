@@ -139,6 +139,12 @@ const markSchema = z.object({
     .min(1),
 });
 
+const overrideSchema = z.object({
+  studentId: z.string(),
+  date: z.string(),
+  reason: z.string().min(3),
+});
+
 router.post('/attendance/mark', async (req, res) => {
   const parse = markSchema.safeParse(req.body);
   if (!parse.success) {
@@ -169,6 +175,84 @@ router.post('/attendance/mark', async (req, res) => {
     console.error(err);
     res.status(500).json({ error: 'Failed to mark attendance' });
   }
+});
+
+router.post('/attendance/override', async (req, res) => {
+  const parse = overrideSchema.safeParse(req.body);
+  if (!parse.success) {
+    return res.status(400).json({ error: 'Invalid body', details: parse.error.flatten() });
+  }
+
+  const { studentId, date, reason } = parse.data;
+  const actorUserId = req.auth!.userId;
+  const role = req.auth!.role;
+  if (role !== 'teacher' && role !== 'class_teacher' && role !== 'hod') {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  const student = await prisma.student.findUnique({
+    where: { id: studentId },
+    include: { class: true },
+  });
+  if (!student) {
+    return res.status(404).json({ error: 'Student not found' });
+  }
+
+  if (role !== 'hod') {
+    const assignedClass = await prisma.class.findFirst({
+      where: { classTeacherId: actorUserId },
+      select: { id: true },
+    });
+    if (!assignedClass || assignedClass.id !== student.classId) {
+      return res.status(403).json({ error: 'You can only override attendance for your class' });
+    }
+  }
+
+  const targetDate = new Date(`${date}T00:00:00.000Z`);
+  const nextDate = new Date(targetDate);
+  nextDate.setUTCDate(nextDate.getUTCDate() + 1);
+
+  const absentRecords = await prisma.attendanceRecord.findMany({
+    where: {
+      studentId,
+      status: 'absent',
+      attendanceDate: {
+        gte: targetDate,
+        lt: nextDate,
+      },
+    },
+  });
+
+  if (absentRecords.length === 0) {
+    return res.status(404).json({ error: 'No absence records found for this student on this date' });
+  }
+
+  await prisma.$transaction(async tx => {
+    for (const record of absentRecords) {
+      // eslint-disable-next-line no-await-in-loop
+      await tx.attendanceRecord.update({
+        where: { id: record.id },
+        data: {
+          status: 'present',
+          overrideReason: reason,
+        },
+      });
+
+      // eslint-disable-next-line no-await-in-loop
+      await tx.auditLog.create({
+        data: {
+          attendanceRecordId: record.id,
+          actorUserId,
+          previousStatus: 'absent',
+          newStatus: 'present',
+          reason,
+        },
+      });
+    }
+  });
+
+  await recomputeStudentAnalytics(studentId);
+  return res.json({ overriddenCount: absentRecords.length });
 });
 
 export default router;

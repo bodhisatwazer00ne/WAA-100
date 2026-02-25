@@ -6,6 +6,14 @@ const router = Router();
 
 router.use(authMiddleware);
 
+router.get('/classes', async (_req, res) => {
+  const rows = await prisma.class.findMany({
+    select: { id: true, name: true, semester: true },
+    orderBy: { name: 'asc' },
+  });
+  res.json(rows);
+});
+
 router.get('/student/:studentId', async (req, res) => {
   const { studentId } = req.params;
   const cache = await prisma.analyticsCache.findUnique({ where: { studentId } });
@@ -84,6 +92,34 @@ router.get('/department/summary', async (_req, res) => {
   });
 
   res.json(classSummary);
+});
+
+router.get('/department/subject-performance', async (_req, res) => {
+  const subjects = await prisma.subject.findMany({
+    select: { id: true, code: true, name: true },
+    orderBy: { code: 'asc' },
+  });
+
+  const records = await prisma.attendanceRecord.findMany({
+    select: { subjectId: true, status: true },
+  });
+
+  const rows = subjects.map(subject => {
+    const subjectRecords = records.filter(record => record.subjectId === subject.id);
+    const present = subjectRecords.filter(record => record.status === 'present').length;
+    const total = subjectRecords.length;
+    const pct = total > 0 ? Math.round((present / total) * 100) : 0;
+    return {
+      id: subject.id,
+      code: subject.code,
+      name: subject.name,
+      pct,
+      present,
+      total,
+    };
+  });
+
+  res.json(rows);
 });
 
 export default router;

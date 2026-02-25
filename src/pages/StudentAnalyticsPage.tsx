@@ -1,14 +1,66 @@
-import { students, analyticsCache, classes } from '@/data/mockData';
-import { getClassAnalytics, getRiskDistribution } from '@/services/attendanceService';
+import { useEffect, useMemo, useState } from 'react';
+import { apiRequest } from '@/lib/api';
 import { RiskBadge } from '@/components/RiskBadge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
+interface ClassRow {
+  id: string;
+  name: string;
+  semester: number;
+}
+
+interface ClassAnalyticsRow {
+  student: {
+    id: string;
+    name: string;
+    rollNumber: string;
+  };
+  analytics: {
+    overallPct: number;
+    riskLevel: 'safe' | 'moderate' | 'high';
+  } | null;
+}
+
 export default function StudentAnalyticsPage() {
-  const [selectedClass, setSelectedClass] = useState(classes[0]?.id || '');
-  const classData = getClassAnalytics(selectedClass);
+  const [classes, setClasses] = useState<ClassRow[]>([]);
+  const [selectedClass, setSelectedClass] = useState('');
+  const [classData, setClassData] = useState<ClassAnalyticsRow[]>([]);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const rows = await apiRequest<ClassRow[]>('/api/analytics/classes');
+        setClasses(rows);
+        if (rows.length > 0) setSelectedClass(rows[0].id);
+      } catch {
+        setClasses([]);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedClass) {
+      setClassData([]);
+      return;
+    }
+    void (async () => {
+      try {
+        const rows = await apiRequest<ClassAnalyticsRow[]>(`/api/analytics/class/${selectedClass}`);
+        setClassData(rows);
+      } catch {
+        setClassData([]);
+      }
+    })();
+  }, [selectedClass]);
+
+  const chartData = useMemo(() => {
+    return classData.map(row => ({
+      name: row.student.name.split(' ')[0],
+      pct: row.analytics?.overallPct ?? 0,
+    }));
+  }, [classData]);
 
   return (
     <div>
@@ -21,7 +73,7 @@ export default function StudentAnalyticsPage() {
         <Select value={selectedClass} onValueChange={setSelectedClass}>
           <SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger>
           <SelectContent>
-            {classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+            {classes.map(classRow => <SelectItem key={classRow.id} value={classRow.id}>{classRow.name}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
@@ -30,10 +82,7 @@ export default function StudentAnalyticsPage() {
         <CardHeader><CardTitle className="text-base">Attendance Distribution</CardTitle></CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={250}>
-            <BarChart data={classData.map(d => ({
-              name: d.student.name.split(' ')[0],
-              pct: d.analytics?.overall_pct || 0,
-            }))}>
+            <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(214, 20%, 88%)" />
               <XAxis dataKey="name" tick={{ fontSize: 11 }} />
               <YAxis domain={[0, 100]} />
@@ -57,12 +106,12 @@ export default function StudentAnalyticsPage() {
                 </tr>
               </thead>
               <tbody>
-                {classData.map(d => (
-                  <tr key={d.student.id} className="border-b last:border-0">
-                    <td className="p-3 font-mono text-xs">{d.student.roll_number}</td>
-                    <td className="p-3 font-medium">{d.student.name}</td>
-                    <td className="p-3 font-semibold">{d.analytics?.overall_pct || 0}%</td>
-                    <td className="p-3"><RiskBadge level={d.analytics?.risk_level || 'safe'} /></td>
+                {classData.map(row => (
+                  <tr key={row.student.id} className="border-b last:border-0">
+                    <td className="p-3 font-mono text-xs">{row.student.rollNumber}</td>
+                    <td className="p-3 font-medium">{row.student.name}</td>
+                    <td className="p-3 font-semibold">{row.analytics?.overallPct ?? 0}%</td>
+                    <td className="p-3"><RiskBadge level={row.analytics?.riskLevel ?? 'safe'} /></td>
                   </tr>
                 ))}
               </tbody>

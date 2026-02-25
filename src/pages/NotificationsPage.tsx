@@ -1,14 +1,27 @@
-import { useAuth } from '@/contexts/AuthContext';
-import { notifications as allNotifications, students } from '@/data/mockData';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useEffect, useState } from 'react';
+import { apiRequest } from '@/lib/api';
+import { Card, CardContent } from '@/components/ui/card';
 import { Bell, BellOff } from 'lucide-react';
 
+interface NotificationRow {
+  id: string;
+  message: string;
+  createdAt: string;
+}
+
 export default function NotificationsPage() {
-  const { user } = useAuth();
-  const student = students.find(s => s.user_id === user?.id);
-  const notifs = student
-    ? allNotifications.filter(n => n.student_id === student.id).sort((a, b) => b.created_at.localeCompare(a.created_at))
-    : [];
+  const [notifs, setNotifs] = useState<NotificationRow[]>([]);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const rows = await apiRequest<NotificationRow[]>('/api/notifications/me');
+        setNotifs(rows);
+      } catch {
+        setNotifs([]);
+      }
+    })();
+  }, []);
 
   return (
     <div>
@@ -24,14 +37,18 @@ export default function NotificationsPage() {
         </div>
       ) : (
         <div className="space-y-2 max-w-2xl">
-          {notifs.map(n => (
-            <Card key={n.id} className={n.read ? 'opacity-60' : ''}>
+          {notifs.map(notif => (
+            <Card key={notif.id}>
               <CardContent className="p-4 flex items-start gap-3">
-                <Bell className={`h-4 w-4 mt-0.5 shrink-0 ${n.read ? 'text-muted-foreground' : 'text-danger'}`} />
+                <Bell className="h-4 w-4 mt-0.5 shrink-0 text-danger" />
                 <div>
-                  <p className="text-sm">{n.message}</p>
+                  <p className="text-sm">{notif.message}</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {new Date(n.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    {new Date(notif.createdAt).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })}
                   </p>
                 </div>
               </CardContent>

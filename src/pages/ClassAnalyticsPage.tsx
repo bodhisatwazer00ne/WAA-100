@@ -1,43 +1,92 @@
-import { useAuth } from '@/contexts/AuthContext';
-import { classes, attendanceRecords } from '@/data/mockData';
-import { getClassAnalytics, getRiskDistribution } from '@/services/attendanceService';
+import { useEffect, useMemo, useState } from 'react';
+import { apiRequest } from '@/lib/api';
 import { RiskBadge } from '@/components/RiskBadge';
 import { StatCard } from '@/components/StatCard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Users, GraduationCap } from 'lucide-react';
 
+interface MyClassInfo {
+  id: string;
+  name: string;
+  semester: number;
+  totalStudents: number;
+}
+
+interface ClassAnalyticsRow {
+  student: {
+    id: string;
+    name: string;
+    rollNumber: string;
+  };
+  analytics: {
+    overallPct: number;
+    riskLevel: 'safe' | 'moderate' | 'high';
+    subjectWise: {
+      subjectId: string;
+      subjectName: string;
+      pct: number;
+    }[];
+  } | null;
+}
+
+interface RiskDistribution {
+  safe: number;
+  moderate: number;
+  high: number;
+  total: number;
+}
+
 export default function ClassAnalyticsPage() {
-  const { user } = useAuth();
-  const cls = classes.find(c => c.class_teacher_id === user?.id);
-  if (!cls) return <p className="text-muted-foreground">No class assigned</p>;
+  const [myClass, setMyClass] = useState<MyClassInfo | null>(null);
+  const [classData, setClassData] = useState<ClassAnalyticsRow[]>([]);
+  const [risk, setRisk] = useState<RiskDistribution>({ safe: 0, moderate: 0, high: 0, total: 0 });
+  const [dateRangeLabel, setDateRangeLabel] = useState('No attendance records');
 
-  const classData = getClassAnalytics(cls.id);
-  const risk = getRiskDistribution(cls.id);
-  const classRecords = attendanceRecords.filter(r => r.class_id === cls.id);
-  const classDates = classRecords.map(r => r.attendance_date).sort();
-  const dateRangeLabel = classDates.length > 0
-    ? `${classDates[0]} to ${classDates[classDates.length - 1]}`
-    : 'No attendance records';
+  useEffect(() => {
+    void (async () => {
+      try {
+        const cls = await apiRequest<MyClassInfo>('/api/reports/my-class');
+        setMyClass(cls);
+        const [analytics, riskDist, dates] = await Promise.all([
+          apiRequest<ClassAnalyticsRow[]>(`/api/analytics/class/${cls.id}`),
+          apiRequest<RiskDistribution>(`/api/analytics/risk-distribution?classId=${encodeURIComponent(cls.id)}`),
+          apiRequest<string[]>('/api/reports/my-class/report-dates'),
+        ]);
+        setClassData(analytics);
+        setRisk(riskDist);
+        if (dates.length > 0) {
+          setDateRangeLabel(`${dates[0]} to ${dates[dates.length - 1]}`);
+        }
+      } catch {
+        setMyClass(null);
+      }
+    })();
+  }, []);
 
-  const subjectAvgs = new Map<string, { total: number; count: number; name: string }>();
-  classData.forEach(d => {
-    d.analytics?.subject_wise.forEach(sw => {
-      const entry = subjectAvgs.get(sw.subject_id) || { total: 0, count: 0, name: sw.subject_name };
-      entry.total += sw.pct;
-      entry.count++;
-      subjectAvgs.set(sw.subject_id, entry);
-    });
-  });
-  const subjectData = Array.from(subjectAvgs.entries()).map(([id, d]) => ({
-    name: d.name.length > 15 ? `${d.name.substring(0, 15)}...` : d.name,
-    avg: Math.round(d.total / d.count),
-  }));
+  const subjectData = useMemo(() => {
+    const map = new Map<string, { total: number; count: number; name: string }>();
+    for (const row of classData) {
+      const subjectWise = row.analytics?.subjectWise ?? [];
+      for (const subject of subjectWise) {
+        const current = map.get(subject.subjectId) ?? { total: 0, count: 0, name: subject.subjectName };
+        current.total += subject.pct;
+        current.count += 1;
+        map.set(subject.subjectId, current);
+      }
+    }
+    return Array.from(map.entries()).map(([, value]) => ({
+      name: value.name.length > 15 ? `${value.name.substring(0, 15)}...` : value.name,
+      avg: value.count > 0 ? Math.round(value.total / value.count) : 0,
+    }));
+  }, [classData]);
+
+  if (!myClass) return <p className="text-muted-foreground">No class assigned</p>;
 
   return (
     <div>
       <div className="page-header">
-        <h1 className="page-title">Class Analytics - {cls.name}</h1>
+        <h1 className="page-title">Class Analytics - {myClass.name}</h1>
         <p className="page-subtitle">Comprehensive attendance analysis for your class | Date range: {dateRangeLabel}</p>
       </div>
 
@@ -76,14 +125,14 @@ export default function ClassAnalyticsPage() {
                 </tr>
               </thead>
               <tbody>
-                {classData
-                  .sort((a, b) => (a.analytics?.overall_pct || 0) - (b.analytics?.overall_pct || 0))
-                  .map(d => (
-                    <tr key={d.student.id} className="border-b last:border-0">
-                      <td className="p-3 font-mono text-xs">{d.student.roll_number}</td>
-                      <td className="p-3 font-medium">{d.student.name}</td>
-                      <td className="p-3 font-semibold">{d.analytics?.overall_pct}%</td>
-                      <td className="p-3"><RiskBadge level={d.analytics?.risk_level || 'safe'} /></td>
+                {[...classData]
+                  .sort((a, b) => (a.analytics?.overallPct ?? 0) - (b.analytics?.overallPct ?? 0))
+                  .map(row => (
+                    <tr key={row.student.id} className="border-b last:border-0">
+                      <td className="p-3 font-mono text-xs">{row.student.rollNumber}</td>
+                      <td className="p-3 font-medium">{row.student.name}</td>
+                      <td className="p-3 font-semibold">{row.analytics?.overallPct ?? 0}%</td>
+                      <td className="p-3"><RiskBadge level={row.analytics?.riskLevel ?? 'safe'} /></td>
                     </tr>
                   ))}
               </tbody>
