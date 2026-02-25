@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { classes } from "@/data/mockData";
+import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import LoginPage from "./pages/LoginPage";
 import DashboardLayout from "./components/DashboardLayout";
 import DashboardPage from "./pages/DashboardPage";
@@ -49,32 +50,34 @@ function FallbackRoute() {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <AuthProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/login" element={<LoginGuard />} />
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route element={<ProtectedRoutes />}>
-              <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/attendance/mark" element={<MarkAttendancePage />} />
-              <Route path="/attendance/my" element={<MyAttendancePage />} />
-              <Route path="/attendance/override" element={<OverrideAttendancePage />} />
-              <Route path="/analytics/students" element={<StudentAnalyticsPage />} />
-              <Route path="/analytics/class" element={<ClassAnalyticsPage />} />
-              <Route path="/analytics/department" element={<DepartmentAnalyticsPage />} />
-              <Route path="/analytics/classes" element={<ClassComparisonPage />} />
-              <Route path="/reports/merged" element={<MergedReportsPage />} />
-              <Route path="/reports/defaulters" element={<DefaultersPage />} />
-              <Route path="/reports/faculty" element={<FacultyOverviewPage />} />
-              <Route path="/recovery" element={<RecoverySimulatorPage />} />
-              <Route path="/notifications" element={<NotificationsPage />} />
-            </Route>
-            <Route path="*" element={<FallbackRoute />} />
-          </Routes>
-        </BrowserRouter>
-      </AuthProvider>
+      <AppErrorBoundary>
+        <Toaster />
+        <Sonner />
+        <AuthProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/login" element={<LoginGuard />} />
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route element={<ProtectedRoutes />}>
+                <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/attendance/mark" element={<MarkAttendancePage />} />
+                <Route path="/attendance/my" element={<MyAttendancePage />} />
+                <Route path="/attendance/override" element={<OverrideAttendancePage />} />
+                <Route path="/analytics/students" element={<StudentAnalyticsPage />} />
+                <Route path="/analytics/class" element={<ClassAnalyticsPage />} />
+                <Route path="/analytics/department" element={<DepartmentAnalyticsPage />} />
+                <Route path="/analytics/classes" element={<ClassComparisonPage />} />
+                <Route path="/reports/merged" element={<MergedReportsPage />} />
+                <Route path="/reports/defaulters" element={<DefaultersPage />} />
+                <Route path="/reports/faculty" element={<FacultyOverviewPage />} />
+                <Route path="/recovery" element={<RecoverySimulatorPage />} />
+                <Route path="/notifications" element={<NotificationsPage />} />
+              </Route>
+              <Route path="*" element={<FallbackRoute />} />
+            </Routes>
+          </BrowserRouter>
+        </AuthProvider>
+      </AppErrorBoundary>
     </TooltipProvider>
   </QueryClientProvider>
 );
