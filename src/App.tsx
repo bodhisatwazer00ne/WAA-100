@@ -2,9 +2,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import { classes } from "@/data/mockData";
 import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import LoginPage from "./pages/LoginPage";
 import DashboardLayout from "./components/DashboardLayout";
@@ -33,10 +32,7 @@ function ProtectedRoutes() {
 function LoginGuard() {
   const { isAuthenticated, user } = useAuth();
   if (isAuthenticated && user) {
-    if (user.role === 'teacher') {
-      const isClassTeacher = classes.some(c => c.class_teacher_id === user.id);
-      return <Navigate to={isClassTeacher ? "/reports/merged" : "/attendance/mark"} replace />;
-    }
+    if (user.role === 'teacher') return <Navigate to="/attendance/mark" replace />;
     return <Navigate to="/dashboard" replace />;
   }
   return <LoginPage />;
@@ -54,7 +50,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <AuthProvider>
-          <BrowserRouter>
+          <HashRouter>
             <Routes>
               <Route path="/login" element={<LoginGuard />} />
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -75,7 +71,7 @@ const App = () => (
               </Route>
               <Route path="*" element={<FallbackRoute />} />
             </Routes>
-          </BrowserRouter>
+          </HashRouter>
         </AuthProvider>
       </AppErrorBoundary>
     </TooltipProvider>

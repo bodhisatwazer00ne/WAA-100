@@ -9,6 +9,7 @@ import {
   markAttendance,
 } from '../services/attendanceService.js';
 import { recomputeStudentAnalytics } from '../analytics/analyticsEngine.js';
+import { prisma } from '../db/client.js';
 
 const router = Router();
 
@@ -51,6 +52,77 @@ router.get('/attendance/check', async (req, res) => {
   }
   const has = await hasAttendanceForDate(classId, subjectId, new Date(date));
   res.json({ exists: has });
+});
+
+router.get('/attendance/records', async (req, res) => {
+  const { classId, subjectId, date } = req.query as {
+    classId?: string;
+    subjectId?: string;
+    date?: string;
+  };
+  if (!classId || !subjectId || !date) {
+    return res.status(400).json({ error: 'classId, subjectId and date are required' });
+  }
+
+  const records = await prisma.attendanceRecord.findMany({
+    where: {
+      classId,
+      subjectId,
+      attendanceDate: new Date(date),
+    },
+    include: {
+      student: {
+        include: {
+          user: true,
+        },
+      },
+    },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  res.json(
+    records.map(r => ({
+      id: r.id,
+      studentId: r.studentId,
+      status: r.status,
+      studentName: r.student.user.name,
+      rollNumber: r.student.rollNumber,
+    })),
+  );
+});
+
+router.get('/attendance/student/:studentId', async (req, res) => {
+  const { studentId } = req.params;
+  const role = req.auth!.role;
+  const userId = req.auth!.userId;
+
+  if (role === 'student') {
+    const self = await prisma.student.findUnique({ where: { userId } });
+    if (!self || self.id !== studentId) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+  }
+
+  const records = await prisma.attendanceRecord.findMany({
+    where: { studentId },
+    include: {
+      subject: true,
+      class: true,
+    },
+    orderBy: { attendanceDate: 'desc' },
+  });
+
+  res.json(
+    records.map(r => ({
+      id: r.id,
+      attendanceDate: r.attendanceDate.toISOString().split('T')[0],
+      status: r.status,
+      subjectId: r.subjectId,
+      subjectName: r.subject.name,
+      classId: r.classId,
+      className: r.class.name,
+    })),
+  );
 });
 
 const markSchema = z.object({

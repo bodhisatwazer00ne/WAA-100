@@ -1,18 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import {
-  getTeacherSubjects,
-  getTeacherClassesForSubject,
-  getStudentsByClass,
-  hasAttendanceForDate,
-} from '@/services/attendanceService';
-import {
-  subjects as allSubjects,
-  classes as allClasses,
-  attendanceRecords,
-  recomputeAnalyticsCache,
-  persistAttendanceRecords,
-} from '@/data/mockData';
 import type { AttendanceStatus } from '@/types/waa';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,11 +10,37 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { ClipboardCheck, Download, Loader2 } from 'lucide-react';
 import { downloadTablePdf } from '@/lib/pdf';
-import { apiUrl } from '@/lib/api';
+import { apiRequest } from '@/lib/api';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+
+interface TeacherSubject {
+  id: string;
+  code: string;
+  name: string;
+}
+
+interface TeacherClass {
+  id: string;
+  name: string;
+}
+
+interface ClassStudent {
+  id: string;
+  rollNumber: string;
+  name: string;
+  email: string;
+}
+
+interface AttendanceRecordRow {
+  id: string;
+  studentId: string;
+  studentName: string;
+  rollNumber: string;
+  status: AttendanceStatus;
+}
 
 interface LastSubmission {
   subjectName: string;
@@ -50,51 +63,131 @@ export default function MarkAttendancePage() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [lastSubmission, setLastSubmission] = useState<LastSubmission | null>(null);
 
+  const [teacherSubjects, setTeacherSubjects] = useState<TeacherSubject[]>([]);
+  const [teacherClasses, setTeacherClasses] = useState<TeacherClass[]>([]);
+  const [studentList, setStudentList] = useState<ClassStudent[]>([]);
+  const [alreadyMarked, setAlreadyMarked] = useState(false);
+  const [existingSubmission, setExistingSubmission] = useState<LastSubmission | null>(null);
+
+  const selectedSubjectName = useMemo(
+    () => teacherSubjects.find(s => s.id === selectedSubject)?.name || selectedSubject,
+    [selectedSubject, teacherSubjects],
+  );
+  const selectedClassName = useMemo(
+    () => teacherClasses.find(c => c.id === selectedClass)?.name || selectedClass,
+    [selectedClass, teacherClasses],
+  );
+
+  useEffect(() => {
+    if (!user) return;
+    void (async () => {
+      try {
+        const data = await apiRequest<TeacherSubject[]>('/api/teacher/subjects');
+        setTeacherSubjects(data);
+      } catch (error) {
+        console.error(error);
+        toast.error('Failed to load teacher subjects');
+      }
+    })();
+  }, [user]);
+
+  useEffect(() => {
+    if (!selectedSubject) {
+      setTeacherClasses([]);
+      return;
+    }
+    void (async () => {
+      try {
+        const data = await apiRequest<TeacherClass[]>(
+          `/api/teacher/classes?subjectId=${encodeURIComponent(selectedSubject)}`,
+        );
+        setTeacherClasses(data);
+      } catch (error) {
+        console.error(error);
+        toast.error('Failed to load classes for subject');
+      }
+    })();
+  }, [selectedSubject]);
+
+  useEffect(() => {
+    if (!selectedClass) {
+      setStudentList([]);
+      return;
+    }
+    void (async () => {
+      try {
+        const data = await apiRequest<ClassStudent[]>(`/api/classes/${selectedClass}/students`);
+        setStudentList(data);
+      } catch (error) {
+        console.error(error);
+        toast.error('Failed to load students');
+      }
+    })();
+  }, [selectedClass]);
+
+  useEffect(() => {
+    if (!selectedClass || !selectedSubject || !selectedDate) {
+      setAlreadyMarked(false);
+      setExistingSubmission(null);
+      return;
+    }
+
+    void (async () => {
+      try {
+        const check = await apiRequest<{ exists: boolean }>(
+          `/api/attendance/check?classId=${encodeURIComponent(selectedClass)}&subjectId=${encodeURIComponent(selectedSubject)}&date=${encodeURIComponent(selectedDate)}`,
+        );
+        setAlreadyMarked(check.exists);
+
+        if (!check.exists) {
+          setExistingSubmission(null);
+          return;
+        }
+
+        const rows = await apiRequest<AttendanceRecordRow[]>(
+          `/api/attendance/records?classId=${encodeURIComponent(selectedClass)}&subjectId=${encodeURIComponent(selectedSubject)}&date=${encodeURIComponent(selectedDate)}`,
+        );
+
+        const present = rows.filter(r => r.status === 'present').length;
+        const absent = rows.length - present;
+        setExistingSubmission({
+          subjectName: selectedSubjectName,
+          className: selectedClassName,
+          date: selectedDate,
+          present,
+          absent,
+          rows: rows
+            .map(r => ({
+              roll: r.rollNumber,
+              name: r.studentName,
+              status: r.status,
+            }))
+            .sort((a, b) => a.roll.localeCompare(b.roll)),
+        });
+      } catch (error) {
+        console.error(error);
+        setAlreadyMarked(false);
+        setExistingSubmission(null);
+      }
+    })();
+  }, [selectedClass, selectedSubject, selectedDate, selectedClassName, selectedSubjectName]);
+
   if (!user) return null;
-
-  const teacherSubjects = getTeacherSubjects(user.id);
-  const teacherClasses = selectedSubject ? getTeacherClassesForSubject(user.id, selectedSubject) : [];
-  const studentList = selectedClass ? getStudentsByClass(selectedClass) : [];
-  const alreadyMarked = selectedClass && selectedSubject
-    ? hasAttendanceForDate(selectedClass, selectedSubject, selectedDate)
-    : false;
-
-  const existingSubmission: LastSubmission | null = selectedClass && selectedSubject && selectedDate
-    ? (() => {
-      const records = attendanceRecords.filter(
-        r => r.class_id === selectedClass && r.subject_id === selectedSubject && r.attendance_date === selectedDate,
-      );
-      if (records.length === 0) return null;
-      const subjectName = allSubjects.find(s => s.id === selectedSubject)?.name || selectedSubject;
-      const className = allClasses.find(c => c.id === selectedClass)?.name || selectedClass;
-      const present = records.filter(r => r.status === 'present').length;
-      const absent = records.length - present;
-      const rows = records
-        .map(r => {
-          const stu = studentList.find(s => s.id === r.student_id);
-          return {
-            roll: stu?.roll_number || r.student_id,
-            name: stu?.name || r.student_id,
-            status: r.status as AttendanceStatus,
-          };
-        })
-        .sort((a, b) => a.roll.localeCompare(b.roll));
-      return { subjectName, className, date: selectedDate, present, absent, rows };
-    })()
-    : null;
 
   const allMarked = studentList.length > 0 && studentList.every(s => attendance[s.id]);
   const unmarkedCount = studentList.filter(s => !attendance[s.id]).length;
 
-  const handleSubjectChange = (val: string) => {
-    setSelectedSubject(val);
+  const handleSubjectChange = (value: string) => {
+    setSelectedSubject(value);
     setSelectedClass('');
     setAttendance({});
+    setExistingSubmission(null);
   };
 
-  const handleClassChange = (val: string) => {
-    setSelectedClass(val);
+  const handleClassChange = (value: string) => {
+    setSelectedClass(value);
     setAttendance({});
+    setExistingSubmission(null);
   };
 
   const handleSubmit = () => {
@@ -105,99 +198,58 @@ export default function MarkAttendancePage() {
     setShowConfirm(true);
   };
 
-  const confirmSubmit = () => {
-    setLoading(true);
-    setTimeout(async () => {
-      const newRecords = studentList.map(s => ({
-        id: `att-new-${Date.now()}-${s.id}`,
-        class_id: selectedClass,
-        subject_id: selectedSubject,
-        teacher_id: user.id,
-        student_id: s.id,
-        attendance_date: selectedDate,
-        status: attendance[s.id],
-        created_at: new Date().toISOString(),
-        modified_at: new Date().toISOString(),
-      }));
+  const confirmSubmit = async () => {
+    try {
+      setLoading(true);
+      await apiRequest<{ count: number }>(
+        '/api/attendance/mark',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            classId: selectedClass,
+            subjectId: selectedSubject,
+            date: selectedDate,
+            attendance: Object.entries(attendance).map(([studentId, status]) => ({
+              studentId,
+              status,
+            })),
+          }),
+        },
+      );
 
-      attendanceRecords.push(...(newRecords as any));
-      persistAttendanceRecords();
-      recomputeAnalyticsCache();
-
-      const subjectName = allSubjects.find(s => s.id === selectedSubject)?.name || selectedSubject;
-      const className = allClasses.find(c => c.id === selectedClass)?.name || selectedClass;
       const present = Object.values(attendance).filter(v => v === 'present').length;
       const absent = Object.values(attendance).filter(v => v === 'absent').length;
 
-      setLastSubmission({
-        subjectName,
-        className,
+      const submission: LastSubmission = {
+        subjectName: selectedSubjectName,
+        className: selectedClassName,
         date: selectedDate,
         present,
         absent,
         rows: studentList.map(stu => ({
-          roll: stu.roll_number,
+          roll: stu.rollNumber,
           name: stu.name,
           status: attendance[stu.id],
         })),
-      });
+      };
 
-      const absentPayload = studentList
-        .filter(stu => attendance[stu.id] === 'absent')
-        .map(stu => {
-          const subjectRecords = attendanceRecords.filter(
-            r => r.student_id === stu.id && r.subject_id === selectedSubject,
-          );
-          const total = subjectRecords.length;
-          const presentInSubject = subjectRecords.filter(r => r.status === 'present').length;
-          const subjectPct = total > 0 ? (presentInSubject / total) * 100 : 100;
-          const riskCategory = subjectPct >= 85 ? 'safe' : subjectPct >= 75 ? 'moderate' : 'high';
-          return {
-            studentName: stu.name,
-            email: stu.email,
-            subjectName,
-            className,
-            date: selectedDate,
-            riskCategory,
-            subjectPct,
-          };
-        });
-
-      if (absentPayload.length > 0) {
-        try {
-          const resp = await fetch(apiUrl('/api/public/notify-absences'), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ absences: absentPayload }),
-          });
-          if (!resp.ok) {
-            const errorBody = await resp.text();
-            console.error('Failed to send absence emails:', errorBody);
-            toast.error('Attendance saved, but absence email sending failed.');
-          } else {
-            const result = await resp.json();
-            if (result.failed > 0) {
-              const firstFailure = result.failures?.[0];
-              toast.error(
-                `Attendance saved. Emails sent: ${result.sent}/${result.total}. First error: ${firstFailure?.reason || 'Unknown SMTP error'}`,
-              );
-            } else {
-              toast.success(`Attendance saved. Emails sent: ${result.sent}/${result.total}`);
-            }
-          }
-        } catch (error) {
-          console.error('Error sending absence emails:', error);
-          toast.error('Attendance saved, but could not connect to email service.');
-        }
-      }
-
-      toast.success(`Attendance saved for ${studentList.length} students`);
+      setLastSubmission(submission);
       setAttendance({});
-      setSelectedClass('');
-      setSelectedSubject('');
-      setLoading(false);
       setShowConfirm(false);
-    }, 600);
+      setAlreadyMarked(true);
+      setExistingSubmission(submission);
+      toast.success(`Attendance saved for ${studentList.length} students`);
+    } catch (error: any) {
+      const message = String(error?.message ?? '');
+      if (message.includes('already recorded')) {
+        toast.error('Attendance already recorded for this class, subject, and date');
+        setAlreadyMarked(true);
+      } else {
+        toast.error('Failed to save attendance');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const downloadSubmissionPdf = (submission: LastSubmission | null) => {
@@ -224,9 +276,6 @@ export default function MarkAttendancePage() {
     });
     toast.success('PDF downloaded');
   };
-
-  const subjectName = allSubjects.find(s => s.id === selectedSubject)?.name;
-  const className = allClasses.find(c => c.id === selectedClass)?.name;
 
   return (
     <div>
@@ -282,9 +331,9 @@ export default function MarkAttendancePage() {
         <>
           <div className="sticky top-0 z-10 bg-card border rounded-lg p-3 mb-4 flex items-center justify-between shadow-sm">
             <div className="flex items-center gap-4 text-sm">
-              <span className="font-medium">{subjectName}</span>
+              <span className="font-medium">{selectedSubjectName}</span>
               <span className="text-muted-foreground">|</span>
-              <span>{className}</span>
+              <span>{selectedClassName}</span>
               <span className="text-muted-foreground">|</span>
               <span>{selectedDate}</span>
             </div>
@@ -322,7 +371,7 @@ export default function MarkAttendancePage() {
                       <span className="text-xs text-muted-foreground w-6">{i + 1}</span>
                       <div>
                         <p className="font-medium text-sm">{stu.name}</p>
-                        <p className="text-xs text-muted-foreground">{stu.roll_number}</p>
+                        <p className="text-xs text-muted-foreground">{stu.rollNumber}</p>
                       </div>
                     </div>
                     <RadioGroup
@@ -361,7 +410,7 @@ export default function MarkAttendancePage() {
               <AlertDialogHeader>
                 <AlertDialogTitle>Confirm Attendance Submission</AlertDialogTitle>
                 <AlertDialogDescription>
-                  You are about to submit attendance for {studentList.length} students in {subjectName} ({className}) for {selectedDate}.
+                  You are about to submit attendance for {studentList.length} students in {selectedSubjectName} ({selectedClassName}) for {selectedDate}.
                   <br /><br />
                   Present: {Object.values(attendance).filter(v => v === 'present').length} |
                   Absent: {Object.values(attendance).filter(v => v === 'absent').length}
@@ -378,3 +427,4 @@ export default function MarkAttendancePage() {
     </div>
   );
 }
+

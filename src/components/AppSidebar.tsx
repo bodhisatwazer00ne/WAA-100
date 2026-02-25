@@ -4,7 +4,6 @@ import {
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth } from '@/contexts/AuthContext';
-import { classes } from '@/data/mockData';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
   SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem,
@@ -31,11 +30,10 @@ export function AppSidebar() {
   const { user } = useAuth();
   if (!user) return null;
 
-  const isAssignedClassTeacher = user.role === 'teacher' && classes.some(c => c.class_teacher_id === user.id);
   const items = user.role === 'teacher'
     ? [
         ...navItems.teacher,
-        ...(isAssignedClassTeacher ? [{ title: "Your Class's Report", url: '/reports/merged', icon: FileText }] : []),
+        { title: "Your Class's Report", url: '/reports/merged', icon: FileText },
       ]
     : (navItems[user.role] || []);
   const roleLabel = user.role === 'hod' ? 'HOD' : user.role === 'teacher' ? 'Teacher' : 'Student';

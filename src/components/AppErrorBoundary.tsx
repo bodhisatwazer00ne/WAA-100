@@ -17,7 +17,7 @@ export class AppErrorBoundary extends React.Component<
   componentDidCatch(error: unknown) {
     console.error('App crashed, redirecting to /login', error);
     if (typeof window !== 'undefined') {
-      window.location.replace('/login');
+      window.location.replace('/#/login');
     }
   }
 
@@ -33,4 +33,3 @@ export class AppErrorBoundary extends React.Component<
     return this.props.children;
   }
 }
-

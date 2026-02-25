@@ -1,33 +1,98 @@
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { attendanceRecords, classes, students, subjects } from '@/data/mockData';
-import { getStudentAnalytics, getAttendanceTrend } from '@/services/attendanceService';
+import { apiRequest } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RiskBadge } from '@/components/RiskBadge';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
+interface StudentAnalyticsResponse {
+  overallPct: number;
+  subjectWise: { subjectId: string; subjectName: string; pct: number; attended: number; total: number }[];
+  riskLevel: 'safe' | 'moderate' | 'high';
+  weeklyAvg: number;
+}
+
+interface StudentAttendanceRecord {
+  id: string;
+  attendanceDate: string;
+  status: 'present' | 'absent';
+  subjectId: string;
+  subjectName: string;
+  classId: string;
+  className: string;
+}
+
+interface TrendPoint {
+  date: string;
+  pct: number;
+}
+
+function computeTrend(records: StudentAttendanceRecord[]): TrendPoint[] {
+  if (records.length === 0) return [];
+
+  const sorted = [...records].sort((a, b) => a.attendanceDate.localeCompare(b.attendanceDate));
+  let cumulativeTotal = 0;
+  let cumulativePresent = 0;
+  return sorted.map(record => {
+    cumulativeTotal += 1;
+    if (record.status === 'present') cumulativePresent += 1;
+    return {
+      date: record.attendanceDate,
+      pct: Math.round((cumulativePresent / cumulativeTotal) * 100),
+    };
+  });
+}
+
 export default function MyAttendancePage() {
   const { user } = useAuth();
-  const student = students.find(s => s.user_id === user?.id);
-  if (!student) return <p>Student not found</p>;
+  const studentProfileId = (user as any)?.profile_id as string | undefined;
 
-  const analytics = getStudentAnalytics(student.id);
-  const trend = getAttendanceTrend(student.id);
-  const dateWiseRecords = attendanceRecords
-    .filter(r => r.student_id === student.id)
-    .sort((a, b) => b.attendance_date.localeCompare(a.attendance_date));
+  const [analytics, setAnalytics] = useState<StudentAnalyticsResponse | null>(null);
+  const [records, setRecords] = useState<StudentAttendanceRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  if (!analytics) return <p>No analytics data</p>;
+  useEffect(() => {
+    if (!studentProfileId) {
+      setError('Student profile not found. Please sign in again.');
+      setLoading(false);
+      return;
+    }
+
+    void (async () => {
+      try {
+        setLoading(true);
+        const [analyticsData, recordsData] = await Promise.all([
+          apiRequest<StudentAnalyticsResponse>(`/api/analytics/student/${studentProfileId}`),
+          apiRequest<StudentAttendanceRecord[]>(`/api/attendance/student/${studentProfileId}`),
+        ]);
+        setAnalytics(analyticsData);
+        setRecords(recordsData);
+      } catch (e) {
+        console.error(e);
+        setError('Failed to load attendance data');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [studentProfileId]);
+
+  const trend = useMemo(() => computeTrend(records), [records]);
+
+  if (loading) return <p className="text-sm text-muted-foreground">Loading attendance...</p>;
+  if (error) return <p className="text-sm text-danger">{error}</p>;
+  if (!analytics) return <p className="text-sm text-muted-foreground">No analytics data yet.</p>;
 
   return (
     <div>
       <div className="page-header">
         <h1 className="page-title">My Attendance</h1>
-        <p className="page-subtitle">{student.name} - {student.roll_number}</p>
+        <p className="page-subtitle">{user?.name}</p>
       </div>
 
       <div className="flex items-center gap-3 mb-6">
-        <span className="text-4xl font-bold">{analytics.overall_pct}%</span>
-        <RiskBadge level={analytics.risk_level} />
+        <span className="text-4xl font-bold">{analytics.overallPct}%</span>
+        <RiskBadge level={analytics.riskLevel} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
@@ -50,10 +115,10 @@ export default function MyAttendancePage() {
           <CardHeader><CardTitle className="text-base">Subject-wise Details</CardTitle></CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {analytics.subject_wise.map(sw => (
-                <div key={sw.subject_id}>
+              {analytics.subjectWise.map(sw => (
+                <div key={sw.subjectId}>
                   <div className="flex justify-between text-sm mb-1">
-                    <span className="font-medium">{sw.subject_name}</span>
+                    <span className="font-medium">{sw.subjectName}</span>
                     <span className={`font-semibold ${sw.pct >= 85 ? 'text-success' : sw.pct >= 75 ? 'text-warning' : 'text-danger'}`}>
                       {sw.pct}%
                     </span>
@@ -79,7 +144,7 @@ export default function MyAttendancePage() {
           <CardTitle className="text-base">Date-wise Attendance</CardTitle>
         </CardHeader>
         <CardContent>
-          {dateWiseRecords.length === 0 ? (
+          {records.length === 0 ? (
             <p className="text-sm text-muted-foreground">No attendance records found yet.</p>
           ) : (
             <div className="overflow-x-auto">
@@ -93,20 +158,16 @@ export default function MyAttendancePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {dateWiseRecords.map((r) => {
-                    const subjectName = subjects.find(s => s.id === r.subject_id)?.name || r.subject_id;
-                    const className = classes.find(c => c.id === r.class_id)?.name || r.class_id;
-                    return (
-                      <tr key={r.id} className="border-b last:border-0">
-                        <td className="py-2.5 pr-4">{r.attendance_date}</td>
-                        <td className="py-2.5 pr-4">{subjectName}</td>
-                        <td className="py-2.5 pr-4">{className}</td>
-                        <td className={`py-2.5 font-medium ${r.status === 'present' ? 'text-success' : 'text-danger'}`}>
-                          {r.status.toUpperCase()}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {records.map((r) => (
+                    <tr key={r.id} className="border-b last:border-0">
+                      <td className="py-2.5 pr-4">{r.attendanceDate}</td>
+                      <td className="py-2.5 pr-4">{r.subjectName}</td>
+                      <td className="py-2.5 pr-4">{r.className}</td>
+                      <td className={`py-2.5 font-medium ${r.status === 'present' ? 'text-success' : 'text-danger'}`}>
+                        {r.status.toUpperCase()}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -116,3 +177,4 @@ export default function MyAttendancePage() {
     </div>
   );
 }
+

@@ -1,7 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import type { UserRole } from '@/types/waa';
-import { users } from '@/data/mockData';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,15 +14,12 @@ const roleOptions: { role: UserRole; label: string }[] = [
 ];
 
 export default function LoginPage() {
-  const { login, loginAs } = useAuth();
+  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [selectedRole, setSelectedRole] = useState<UserRole>('teacher');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-
-  const rolePreview = useMemo(() => users.find(u => u.role === selectedRole), [selectedRole]);
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -56,7 +52,7 @@ export default function LoginPage() {
 
           <div>
             <h2 className="text-2xl font-bold">Sign In</h2>
-            <p className="text-muted-foreground mt-1">Enter your credentials or select a role to quick-login</p>
+            <p className="text-muted-foreground mt-1">Enter your credentials and select your login role</p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
@@ -89,14 +85,12 @@ export default function LoginPage() {
 
           <div className="relative">
             <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-            <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">Quick Role Login</span></div>
+            <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">Role-based authentication enabled</span></div>
           </div>
 
-          <div className="space-y-3">
-            <Button variant="outline" className="w-full" onClick={() => loginAs(selectedRole)}>
-              Login With Selected Role
-            </Button>
-          </div>
+          <p className="text-xs text-muted-foreground">
+            Use credentials from LOGIN_CREDENTIALS.md. Role must match the selected login role.
+          </p>
         </div>
       </div>
     </div>
