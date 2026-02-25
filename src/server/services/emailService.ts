@@ -1,10 +1,11 @@
 import nodemailer from 'nodemailer';
 import { env } from '../config/env.js';
 
-const resendApiBase = env.resend.apiBaseUrl.replace(/\/+$/, '');
-const resendEndpoint = `${resendApiBase}/emails`;
-const hasResendConfig = !!env.resend.apiKey;
-const resendFrom = env.resend.from || env.smtp.from;
+const mailgunApiBase = env.mailgun.apiBaseUrl.replace(/\/+$/, '');
+const mailgunEndpoint = `${mailgunApiBase}/v3/${env.mailgun.domain}/messages`;
+const hasMailgunConfig = !!env.mailgun.apiKey && !!env.mailgun.domain;
+const hasPartialMailgunConfig = !!env.mailgun.apiKey || !!env.mailgun.domain;
+const mailgunFrom = env.mailgun.from || env.smtp.from;
 
 const hasUrl = !!env.smtp.url;
 const hasService = !!env.smtp.service;
@@ -36,9 +37,9 @@ interface SendEmailOptions {
   html?: string;
 }
 
-const RESEND_MAX_ATTEMPTS = 5;
-const RESEND_BASE_DELAY_MS = 500;
-const RESEND_MAX_DELAY_MS = 20_000;
+const MAILGUN_MAX_ATTEMPTS = 5;
+const MAILGUN_BASE_DELAY_MS = 500;
+const MAILGUN_MAX_DELAY_MS = 20_000;
 
 function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -64,41 +65,45 @@ function parseRetryAfterMs(retryAfter: string | null): number | null {
 function getBackoffMs(attempt: number, retryAfterHeader: string | null): number {
   const retryAfterMs = parseRetryAfterMs(retryAfterHeader);
   if (retryAfterMs !== null) {
-    return Math.min(RESEND_MAX_DELAY_MS, retryAfterMs);
+    return Math.min(MAILGUN_MAX_DELAY_MS, retryAfterMs);
   }
-  const exp = RESEND_BASE_DELAY_MS * 2 ** (attempt - 1);
-  return Math.min(RESEND_MAX_DELAY_MS, exp);
+  const exp = MAILGUN_BASE_DELAY_MS * 2 ** (attempt - 1);
+  return Math.min(MAILGUN_MAX_DELAY_MS, exp);
 }
 
-async function sendViaResend(options: SendEmailOptions) {
-  if (!resendFrom) {
-    throw new Error('Resend configured but sender address is missing (set RESEND_FROM)');
+async function sendViaMailgun(options: SendEmailOptions) {
+  if (!mailgunFrom) {
+    throw new Error('Mailgun configured but sender address is missing (set MAILGUN_FROM or SMTP_FROM)');
+  }
+  if (!options.text && !options.html) {
+    throw new Error('Either text or html body is required');
   }
 
-  const payload = {
-    from: resendFrom,
-    to: [options.to],
-    subject: options.subject,
-    ...(options.text ? { text: options.text } : {}),
-    ...(options.html ? { html: options.html } : {}),
-  };
+  const payload = new URLSearchParams();
+  payload.set('from', mailgunFrom);
+  payload.set('to', options.to);
+  payload.set('subject', options.subject);
+  if (options.text) payload.set('text', options.text);
+  if (options.html) payload.set('html', options.html);
 
-  for (let attempt = 1; attempt <= RESEND_MAX_ATTEMPTS; attempt += 1) {
+  const authToken = Buffer.from(`api:${env.mailgun.apiKey}`).toString('base64');
+
+  for (let attempt = 1; attempt <= MAILGUN_MAX_ATTEMPTS; attempt += 1) {
     try {
-      const response = await fetch(resendEndpoint, {
+      const response = await fetch(mailgunEndpoint, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${env.resend.apiKey}`,
-          'Content-Type': 'application/json',
+          Authorization: `Basic ${authToken}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: JSON.stringify(payload),
+        body: payload.toString(),
       });
 
       const raw = await response.text();
       if (response.ok) {
-        let parsed: { id?: string } = {};
+        let parsed: { id?: string; message?: string } = {};
         try {
-          parsed = JSON.parse(raw) as { id?: string };
+          parsed = JSON.parse(raw) as { id?: string; message?: string };
         } catch {
           parsed = {};
         }
@@ -107,36 +112,36 @@ async function sendViaResend(options: SendEmailOptions) {
           messageId: parsed.id ?? '',
           accepted: [options.to],
           rejected: [],
-          response: raw,
+          response: parsed.message ?? raw,
         };
       }
 
       const retryable = response.status === 429 || response.status >= 500;
-      if (retryable && attempt < RESEND_MAX_ATTEMPTS) {
+      if (retryable && attempt < MAILGUN_MAX_ATTEMPTS) {
         const waitMs = getBackoffMs(attempt, response.headers.get('retry-after'));
         await sleep(waitMs);
         continue;
       }
 
       throw new Error(
-        `Resend send failed (${response.status}) after ${attempt} attempt(s): ${raw}`,
+        `Mailgun send failed (${response.status}) after ${attempt} attempt(s): ${raw}`,
       );
     } catch (error) {
-      if (attempt < RESEND_MAX_ATTEMPTS) {
+      if (attempt < MAILGUN_MAX_ATTEMPTS) {
         const waitMs = getBackoffMs(attempt, null);
         await sleep(waitMs);
         continue;
       }
-      throw new Error(`Resend request failed after ${attempt} attempt(s): ${String(error)}`);
+      throw new Error(`Mailgun request failed after ${attempt} attempt(s): ${String(error)}`);
     }
   }
 
-  throw new Error('Resend send failed: exhausted retry attempts');
+  throw new Error('Mailgun send failed: exhausted retry attempts');
 }
 
 export async function sendEmail(options: SendEmailOptions) {
-  if (hasResendConfig) {
-    return sendViaResend(options);
+  if (hasMailgunConfig) {
+    return sendViaMailgun(options);
   }
 
   if (!transporter) {
@@ -157,18 +162,26 @@ export async function sendEmail(options: SendEmailOptions) {
 }
 
 export async function verifyEmailConnection() {
-  if (hasResendConfig) {
-    if (!resendFrom) {
+  if (hasPartialMailgunConfig && !hasMailgunConfig) {
+    return {
+      ok: false as const,
+      provider: 'mailgun' as const,
+      reason: 'MAILGUN_API_KEY and MAILGUN_DOMAIN must both be set',
+    };
+  }
+
+  if (hasMailgunConfig) {
+    if (!mailgunFrom) {
       return {
         ok: false as const,
-        provider: 'resend' as const,
-        reason: 'Resend configured but RESEND_FROM/SMTP_FROM missing',
+        provider: 'mailgun' as const,
+        reason: 'Mailgun configured but MAILGUN_FROM/SMTP_FROM missing',
       };
     }
     return {
       ok: true as const,
-      provider: 'resend' as const,
-      detail: `endpoint ${resendEndpoint}`,
+      provider: 'mailgun' as const,
+      detail: `endpoint ${mailgunEndpoint}`,
     };
   }
 

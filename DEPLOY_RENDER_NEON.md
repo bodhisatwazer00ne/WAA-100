@@ -5,7 +5,7 @@ This guide deploys:
 - Frontend: Render Static Site
 - Backend: Render Web Service
 - Database: Neon Postgres
-- Email: Resend (HTTP API, recommended on Render Free)
+- Email: Mailgun API (recommended on Render Free)
 
 ## 1) Prepare Neon Postgres
 
@@ -36,14 +36,15 @@ Set backend environment variables:
 - `JWT_SECRET=<strong_random_secret>`
 - `JWT_EXPIRES_IN=7d`
 - `APP_BASE_URL=https://<your-frontend-service>.onrender.com`
-- `RESEND_API_KEY=<your_resend_api_key>`
-- `RESEND_FROM=WAA-100 <your-verified-sender@yourdomain.com>`
-- `RESEND_API_BASE_URL=https://api.resend.com`
+- `MAILGUN_API_KEY=<your_mailgun_api_key>`
+- `MAILGUN_DOMAIN=<your_mailgun_domain_or_sandbox_domain>`
+- `MAILGUN_FROM=WAA-100 <postmaster@your_mailgun_domain>`
+- `MAILGUN_API_BASE_URL=https://api.mailgun.net`
 
 Notes:
 
 - Backend port is automatically read from Render `PORT`.
-- On Render Free, SMTP ports are blocked, so use Resend HTTP API.
+- On Render Free, SMTP ports are blocked, so use Mailgun API.
 - Health endpoint:
 
 ```txt

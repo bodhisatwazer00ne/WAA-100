@@ -9,7 +9,7 @@ WAA-100 is a full-stack attendance platform with role-based dashboards for **HOD
 - **Database**: PostgreSQL + Prisma ORM
 - **Auth**: JWT + bcrypt
 - **Scheduling**: node-cron
-- **Email**: Resend HTTP API (primary) + Nodemailer SMTP fallback
+- **Email**: Mailgun API (primary) + Nodemailer SMTP fallback
 - **PDF**:
   - Frontend table/matrix PDFs via `src/lib/pdf.ts`
   - Backend PDF endpoint (`src/server/routes/reportRoutes.ts`) uses `pdfkit`
@@ -27,7 +27,7 @@ Create `.env` from `.env.example` and fill required values:
 
 - `DATABASE_URL`
 - `JWT_SECRET`
-- `RESEND_API_KEY` and `RESEND_FROM` for email delivery (recommended)
+- `MAILGUN_API_KEY`, `MAILGUN_DOMAIN`, `MAILGUN_FROM` for email delivery (recommended)
 
 ### 2) Install
 

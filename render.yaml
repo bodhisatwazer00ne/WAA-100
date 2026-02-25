@@ -16,12 +16,14 @@ services:
         value: 7d
       - key: APP_BASE_URL
         sync: false
-      - key: RESEND_API_KEY
+      - key: MAILGUN_API_KEY
         sync: false
-      - key: RESEND_FROM
+      - key: MAILGUN_DOMAIN
         sync: false
-      - key: RESEND_API_BASE_URL
-        value: https://api.resend.com
+      - key: MAILGUN_FROM
+        sync: false
+      - key: MAILGUN_API_BASE_URL
+        value: https://api.mailgun.net
       - key: SMTP_URL
         sync: false
       - key: SMTP_SERVICE

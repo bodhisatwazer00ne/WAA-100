@@ -1,28 +1,29 @@
-# Email Setup (Resend Preferred)
+# Email Setup (Mailgun Preferred)
 
 WAA-100 now supports:
 
-- Resend HTTP API (recommended for Render Free)
-- SMTP via Nodemailer (fallback if Resend key is not set)
+- Mailgun HTTP API (recommended for Render Free)
+- SMTP via Nodemailer (fallback if Mailgun vars are not set)
 
-## 1) Recommended: Resend
+## 1) Recommended: Mailgun Sandbox/Domain API
 
 Set these backend env vars:
 
 ```env
-RESEND_API_KEY="re_xxxxxxxxx"
-RESEND_FROM="WAA-100 <onboarding@resend.dev>"
-RESEND_API_BASE_URL="https://api.resend.com"
+MAILGUN_API_KEY="key-xxxxxxxxxxxxxxxx"
+MAILGUN_DOMAIN="sandbox-xxxx.mailgun.org"
+MAILGUN_FROM="WAA-100 <postmaster@sandbox-xxxx.mailgun.org>"
+MAILGUN_API_BASE_URL="https://api.mailgun.net"
 ```
 
 Notes:
 
-- `RESEND_FROM` must be allowed by your Resend account.
-- For production, verify your own domain sender in Resend.
+- For sandbox mode, recipients must be authorized in Mailgun.
+- For production, switch to a verified custom domain.
 
 ## 2) Optional fallback: SMTP
 
-Use SMTP only when `RESEND_API_KEY` is empty.
+Use SMTP only when Mailgun config is not set.
 
 ```env
 SMTP_SERVICE="gmail"
@@ -36,7 +37,7 @@ SMTP_REQUIRE_TLS="true"
 
 On backend start, look for:
 
-- `Email provider ready (resend): ...`
+- `Email provider ready (mailgun): ...`
 - or `Email provider ready (smtp): ...`
 - otherwise `Email provider not ready (...)`
 
