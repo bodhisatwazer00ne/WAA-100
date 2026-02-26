@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiRequest } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { RiskBadge } from '@/components/RiskBadge';
+import { RiskBadge } from '@/components/app/RiskBadge';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface StudentAnalyticsResponse {
@@ -177,4 +177,5 @@ export default function MyAttendancePage() {
     </div>
   );
 }
+
 

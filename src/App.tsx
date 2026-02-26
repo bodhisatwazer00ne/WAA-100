@@ -4,22 +4,22 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import { AppErrorBoundary } from "@/components/AppErrorBoundary";
-import LoginPage from "./pages/LoginPage";
-import DashboardLayout from "./components/DashboardLayout";
-import DashboardPage from "./pages/DashboardPage";
-import MarkAttendancePage from "./pages/MarkAttendancePage";
-import MyAttendancePage from "./pages/MyAttendancePage";
-import RecoverySimulatorPage from "./pages/RecoverySimulatorPage";
-import NotificationsPage from "./pages/NotificationsPage";
-import StudentAnalyticsPage from "./pages/StudentAnalyticsPage";
-import ClassAnalyticsPage from "./pages/ClassAnalyticsPage";
-import DepartmentAnalyticsPage from "./pages/DepartmentAnalyticsPage";
-import ClassComparisonPage from "./pages/ClassComparisonPage";
-import MergedReportsPage from "./pages/MergedReportsPage";
-import DefaultersPage from "./pages/DefaultersPage";
-import FacultyOverviewPage from "./pages/FacultyOverviewPage";
-import OverrideAttendancePage from "./pages/OverrideAttendancePage";
+import { AppErrorBoundary } from "@/components/app/AppErrorBoundary";
+import LoginPage from "./pages/auth/LoginPage";
+import DashboardLayout from "./components/app/DashboardLayout";
+import DashboardPage from "./pages/hod/DashboardPage";
+import MarkAttendancePage from "./pages/teacher/MarkAttendancePage";
+import MyAttendancePage from "./pages/student/MyAttendancePage";
+import RecoverySimulatorPage from "./pages/student/RecoverySimulatorPage";
+import NotificationsPage from "./pages/student/NotificationsPage";
+import StudentAnalyticsPage from "./pages/student/StudentAnalyticsPage";
+import ClassAnalyticsPage from "./pages/hod/ClassAnalyticsPage";
+import DepartmentAnalyticsPage from "./pages/hod/DepartmentAnalyticsPage";
+import ClassComparisonPage from "./pages/hod/ClassComparisonPage";
+import MergedReportsPage from "./pages/teacher/MergedReportsPage";
+import DefaultersPage from "./pages/teacher/DefaultersPage";
+import FacultyOverviewPage from "./pages/hod/FacultyOverviewPage";
+import OverrideAttendancePage from "./pages/teacher/OverrideAttendancePage";
 
 const queryClient = new QueryClient();
 
@@ -79,3 +79,4 @@ const App = () => (
 );
 
 export default App;
+

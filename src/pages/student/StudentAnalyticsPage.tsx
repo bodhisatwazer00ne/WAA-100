@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { apiRequest } from '@/lib/api';
-import { RiskBadge } from '@/components/RiskBadge';
+import { RiskBadge } from '@/components/app/RiskBadge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -122,3 +122,4 @@ export default function StudentAnalyticsPage() {
     </div>
   );
 }
+

@@ -125,7 +125,7 @@ npm run dev -- --host 127.0.0.1 --port 5173
 ## Deployment (Render + Neon)
 
 Use:
-- `DEPLOY_RENDER_NEON.md`
+- `docs/DEPLOY_RENDER_NEON.md`
 - `render.yaml`
 
 Recommended order:
@@ -136,7 +136,7 @@ Recommended order:
 ## Credentials
 
 - Active login credentials are maintained in:
-  - `LOGIN_CREDENTIALS.md`
+  - `docs/LOGIN_CREDENTIALS.md`
 
 ## Project Structure
 

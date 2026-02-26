@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiRequest } from '@/lib/api';
-import { StatCard } from '@/components/StatCard';
-import { RiskBadge } from '@/components/RiskBadge';
+import { StatCard } from '@/components/app/StatCard';
+import { RiskBadge } from '@/components/app/RiskBadge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -835,3 +835,4 @@ function HodDashboard() {
     </div>
   );
 }
+

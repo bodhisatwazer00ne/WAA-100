@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { apiRequest } from '@/lib/api';
-import { RiskBadge } from '@/components/RiskBadge';
-import { StatCard } from '@/components/StatCard';
+import { RiskBadge } from '@/components/app/RiskBadge';
+import { StatCard } from '@/components/app/StatCard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Users, GraduationCap } from 'lucide-react';
@@ -143,3 +143,4 @@ export default function ClassAnalyticsPage() {
     </div>
   );
 }
+

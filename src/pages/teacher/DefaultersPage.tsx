@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiRequest } from '@/lib/api';
-import { RiskBadge } from '@/components/RiskBadge';
+import { RiskBadge } from '@/components/app/RiskBadge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
@@ -177,3 +177,4 @@ export default function DefaultersPage() {
     </div>
   );
 }
+

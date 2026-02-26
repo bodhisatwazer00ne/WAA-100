@@ -1,6 +1,6 @@
 import { Outlet } from 'react-router-dom';
-import { AppSidebar } from '@/components/AppSidebar';
-import { AppHeader } from '@/components/AppHeader';
+import { AppSidebar } from '@/components/app/AppSidebar';
+import { AppHeader } from '@/components/app/AppHeader';
 import { SidebarProvider } from '@/components/ui/sidebar';
 
 export default function DashboardLayout() {
@@ -18,3 +18,4 @@ export default function DashboardLayout() {
     </SidebarProvider>
   );
 }
+

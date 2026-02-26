@@ -2,7 +2,7 @@ import {
   LayoutDashboard, ClipboardCheck, FileText, BookOpen,
   AlertTriangle, GraduationCap, TrendingUp, Bell
 } from 'lucide-react';
-import { NavLink } from '@/components/NavLink';
+import { NavLink } from '@/components/app/NavLink';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
@@ -76,3 +76,4 @@ export function AppSidebar() {
     </Sidebar>
   );
 }
+

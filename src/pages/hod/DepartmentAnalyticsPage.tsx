@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { apiRequest } from '@/lib/api';
-import { StatCard } from '@/components/StatCard';
+import { StatCard } from '@/components/app/StatCard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { Users, BookOpen, AlertTriangle, GraduationCap } from 'lucide-react';
@@ -127,3 +127,4 @@ export default function DepartmentAnalyticsPage() {
     </div>
   );
 }
+

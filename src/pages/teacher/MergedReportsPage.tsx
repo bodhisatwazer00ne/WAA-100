@@ -8,8 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { FileText, Download } from 'lucide-react';
 import { downloadTablePdf } from '@/lib/pdf';
-import { RiskBadge } from '@/components/RiskBadge';
-import { StatCard } from '@/components/StatCard';
+import { RiskBadge } from '@/components/app/RiskBadge';
+import { StatCard } from '@/components/app/StatCard';
 
 interface ClassInfo {
   id: string;
@@ -410,3 +410,4 @@ export default function MergedReportsPage() {
     </div>
   );
 }
+
