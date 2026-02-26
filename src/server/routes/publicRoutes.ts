@@ -19,10 +19,21 @@ const notifySchema = z.object({
 });
 
 function resolveEmail(studentName: string, email: string) {
-  if (studentName.trim().toLowerCase() === 'aarav patil') {
-    return 'madlad.howdoyoufeelnow@gmail.com';
-  }
-  return email;
+  const allowedEmails = new Set([
+    'theyellowflashlegend@gmail.com',
+    'madlad.howdoyoufeelnow@gmail.com',
+    'bodhisatwa.zerone@gmail.com',
+  ]);
+  const normalized = studentName.trim().toLowerCase();
+  if (normalized === 'harry james potter') return 'theyellowflashlegend@gmail.com';
+  if (normalized === 'steven grant rogers') return 'madlad.howdoyoufeelnow@gmail.com';
+  if (normalized === 'natasha alianovna romanoff') return 'bodhisatwa.zerone@gmail.com';
+  const normalizedEmail = email.trim().toLowerCase();
+  if (normalizedEmail === 'harry.potter@student.edu') return 'theyellowflashlegend@gmail.com';
+  if (normalizedEmail === 'steven.rogers@student.edu') return 'madlad.howdoyoufeelnow@gmail.com';
+  if (normalizedEmail === 'natasha.romanoff@student.edu') return 'bodhisatwa.zerone@gmail.com';
+  if (allowedEmails.has(normalizedEmail)) return normalizedEmail;
+  return '';
 }
 
 router.post('/notify-absences', async (req, res) => {
@@ -37,6 +48,10 @@ router.post('/notify-absences', async (req, res) => {
 
   for (const a of absences) {
     const targetEmail = resolveEmail(a.studentName, a.email);
+    if (!targetEmail) {
+      outcomes.push({ ok: false, email: a.email, reason: 'Recipient not authorized for sandbox sending' });
+      continue;
+    }
     try {
       await sendEmail({
         to: targetEmail,

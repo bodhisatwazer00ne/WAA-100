@@ -8,6 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { downloadTablePdf } from '@/lib/pdf';
 import {
   AlertTriangle,
   BarChart3,
@@ -88,6 +91,44 @@ interface RiskDistribution {
   moderate: number;
   high: number;
   total: number;
+}
+
+interface SubjectPerformanceRow {
+  id: string;
+  code: string;
+  name: string;
+  pct: number;
+}
+
+interface FacultyStatsResponseRow {
+  teacherId: string;
+  teacherName: string;
+  classStats: {
+    classId: string;
+    className: string;
+    present: number;
+    total: number;
+    sessions: number;
+    pct: number;
+  }[];
+  subjectStats: {
+    subjectId: string;
+    subjectName: string;
+    present: number;
+    total: number;
+    sessions: number;
+    pct: number;
+  }[];
+}
+
+interface HodDefaulterRow {
+  studentId: string;
+  rollNumber: string;
+  studentName: string;
+  present: number;
+  total: number;
+  pct: number;
+  riskLevel: 'safe' | 'moderate' | 'high';
 }
 
 const RISK_COLORS = { safe: '#22c55e', moderate: '#eab308', high: '#ef4444' };
@@ -350,144 +391,350 @@ function TeacherDashboard() {
 }
 
 function HodDashboard() {
+  const today = new Date().toISOString().split('T')[0];
+  const [activeTab, setActiveTab] = useState<'faculty' | 'class' | 'subject' | 'defaulters'>('faculty');
   const [summaryRows, setSummaryRows] = useState<DepartmentSummaryRow[]>([]);
-  const [risk, setRisk] = useState<RiskDistribution>({ safe: 0, moderate: 0, high: 0, total: 0 });
-  const [selectedClass, setSelectedClass] = useState('all');
+  const [subjectRows, setSubjectRows] = useState<SubjectPerformanceRow[]>([]);
+  const [facultyRows, setFacultyRows] = useState<FacultyStatsResponseRow[]>([]);
+  const [selectedFacultyId, setSelectedFacultyId] = useState('');
+  const [selectedClassId, setSelectedClassId] = useState('');
+  const [classStudentRows, setClassStudentRows] = useState<
+    { id: string; name: string; rollNumber: string; riskLevel: 'safe' | 'moderate' | 'high'; overallPct: number }[]
+  >([]);
+  const [defaulterRows, setDefaulterRows] = useState<HodDefaulterRow[]>([]);
+  const [startDate, setStartDate] = useState(today);
+  const [endDate, setEndDate] = useState(today);
 
   useEffect(() => {
     void (async () => {
       try {
-        const data = await apiRequest<DepartmentSummaryRow[]>('/api/analytics/department/summary');
-        setSummaryRows(data);
+        const [summary, subjects] = await Promise.all([
+          apiRequest<DepartmentSummaryRow[]>('/api/analytics/department/summary'),
+          apiRequest<SubjectPerformanceRow[]>('/api/analytics/department/subject-performance'),
+        ]);
+        setSummaryRows(summary);
+        setSubjectRows(subjects);
+        if (summary.length > 0) setSelectedClassId(summary[0].id);
       } catch {
         setSummaryRows([]);
+        setSubjectRows([]);
       }
     })();
   }, []);
 
   useEffect(() => {
-    const query = selectedClass === 'all' ? '' : `?classId=${encodeURIComponent(selectedClass)}`;
+    const query = new URLSearchParams();
+    if (startDate) query.set('startDate', startDate);
+    if (endDate) query.set('endDate', endDate);
+
     void (async () => {
       try {
-        const data = await apiRequest<RiskDistribution>(`/api/analytics/risk-distribution${query}`);
-        setRisk(data);
+        const rows = await apiRequest<FacultyStatsResponseRow[]>(`/api/analytics/hod/faculty-stats?${query.toString()}`);
+        setFacultyRows(rows);
+        if (rows.length > 0 && !selectedFacultyId) setSelectedFacultyId(rows[0].teacherId);
       } catch {
-        setRisk({ safe: 0, moderate: 0, high: 0, total: 0 });
+        setFacultyRows([]);
       }
     })();
-  }, [selectedClass]);
+  }, [endDate, startDate, selectedFacultyId]);
 
-  const averagePct = summaryRows.length
-    ? Math.round(summaryRows.reduce((sum, row) => sum + row.avgPct, 0) / summaryRows.length)
-    : 0;
+  useEffect(() => {
+    if (!selectedClassId) {
+      setClassStudentRows([]);
+      setDefaulterRows([]);
+      return;
+    }
+    void (async () => {
+      try {
+        const classAnalytics = await apiRequest<
+          { student: { id: string; name: string; rollNumber: string }; analytics: { overallPct: number; riskLevel: 'safe' | 'moderate' | 'high' } | null }[]
+        >(`/api/analytics/class/${selectedClassId}`);
+        setClassStudentRows(
+          classAnalytics.map(row => ({
+            id: row.student.id,
+            name: row.student.name,
+            rollNumber: row.student.rollNumber,
+            riskLevel: row.analytics?.riskLevel ?? 'safe',
+            overallPct: row.analytics?.overallPct ?? 0,
+          })),
+        );
+      } catch {
+        setClassStudentRows([]);
+      }
+    })();
+  }, [selectedClassId]);
+
+  useEffect(() => {
+    if (!selectedClassId) {
+      setDefaulterRows([]);
+      return;
+    }
+    const query = new URLSearchParams({ classId: selectedClassId });
+    if (startDate) query.set('startDate', startDate);
+    if (endDate) query.set('endDate', endDate);
+    void (async () => {
+      try {
+        const response = await apiRequest<{ defaulters: HodDefaulterRow[] }>(`/api/analytics/hod/defaulters?${query.toString()}`);
+        setDefaulterRows(response.defaulters);
+      } catch {
+        setDefaulterRows([]);
+      }
+    })();
+  }, [selectedClassId, startDate, endDate]);
+
+  const selectedFaculty = facultyRows.find(row => row.teacherId === selectedFacultyId) ?? null;
+  const safeStudents = classStudentRows.filter(row => row.riskLevel === 'safe');
+  const riskStudents = classStudentRows.filter(row => row.riskLevel !== 'safe');
+
+  const downloadDefaultersPdf = () => {
+    const className = summaryRows.find(row => row.id === selectedClassId)?.name ?? selectedClassId;
+    downloadTablePdf({
+      filename: `hod-defaulters-${className.replace(/\s+/g, '-')}-${startDate}-${endDate}.pdf`,
+      title: 'HOD Defaulter List',
+      subtitleLines: [
+        `Class: ${className}`,
+        `Date Range: ${startDate} to ${endDate}`,
+      ],
+      headers: ['Roll No', 'Student Name', 'Present / Total', '%', 'Risk'],
+      rows: defaulterRows.map(row => [
+        row.rollNumber,
+        row.studentName,
+        `${row.present}/${row.total}`,
+        `${row.pct}%`,
+        row.riskLevel.toUpperCase(),
+      ]),
+    });
+  };
 
   return (
     <div>
       <div className="page-header">
         <h1 className="page-title">HOD Dashboard</h1>
-        <p className="page-subtitle">Department analytics from live backend data</p>
+        <p className="page-subtitle">Faculty, class, subject, and defaulter analytics</p>
       </div>
 
-      <div className="mb-4 max-w-sm">
-        <Label>Risk Distribution Scope</Label>
-        <Select value={selectedClass} onValueChange={setSelectedClass}>
-          <SelectTrigger><SelectValue placeholder="Choose class" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Classes</SelectItem>
-            {summaryRows.map(row => (
-              <SelectItem key={row.id} value={row.id}>{row.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div className="space-y-2">
+          <Label>From Date</Label>
+          <Input type="date" value={startDate} onChange={event => setStartDate(event.target.value)} />
+        </div>
+        <div className="space-y-2">
+          <Label>To Date</Label>
+          <Input type="date" value={endDate} onChange={event => setEndDate(event.target.value)} />
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard title="Classes" value={summaryRows.length} icon={Users} />
-        <StatCard title="Average Attendance" value={`${averagePct}%`} icon={TrendingUp} />
-        <StatCard title="Safe Students" value={risk.safe} icon={ClipboardCheck} />
-        <StatCard title="High Risk Students" value={risk.high} icon={AlertTriangle} variant="danger" />
-      </div>
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'faculty' | 'class' | 'subject' | 'defaulters')}>
+        <TabsList className="mb-6 grid w-full grid-cols-2 md:grid-cols-4">
+          <TabsTrigger value="faculty">Faculty Wise Stats</TabsTrigger>
+          <TabsTrigger value="class">Class Wise Stats</TabsTrigger>
+          <TabsTrigger value="subject">Subject Wise Stats</TabsTrigger>
+          <TabsTrigger value="defaulters">Defaulter List</TabsTrigger>
+        </TabsList>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <Card>
-          <CardHeader><CardTitle className="text-base">Class Average Attendance</CardTitle></CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={summaryRows}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(214, 20%, 88%)" />
-                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
-                <Tooltip />
-                <Bar dataKey="avgPct" fill="hsl(220, 60%, 20%)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        <TabsContent value="faculty">
+          <div className="mb-4 max-w-sm">
+            <Label>Select Faculty</Label>
+            <Select value={selectedFacultyId} onValueChange={setSelectedFacultyId}>
+              <SelectTrigger><SelectValue placeholder="Choose faculty" /></SelectTrigger>
+              <SelectContent>
+                {facultyRows.map(row => (
+                  <SelectItem key={row.teacherId} value={row.teacherId}>{row.teacherName}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-        <Card>
-          <CardHeader><CardTitle className="text-base">Risk Distribution</CardTitle></CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={260}>
-              <PieChart>
-                <Pie
-                  data={[
-                    { name: 'Safe', value: risk.safe },
-                    { name: 'Moderate', value: risk.moderate },
-                    { name: 'High', value: risk.high },
-                  ]}
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={85}
-                  dataKey="value"
-                  label
-                >
-                  <Cell fill={RISK_COLORS.safe} />
-                  <Cell fill={RISK_COLORS.moderate} />
-                  <Cell fill={RISK_COLORS.high} />
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader><CardTitle className="text-base">Class-wise Stats</CardTitle></CardHeader>
+              <CardContent>
+                {!selectedFaculty || selectedFaculty.classStats.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No class stats for selected faculty.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="text-left border-b text-muted-foreground">
+                        <tr>
+                          <th className="py-2.5 pr-4">Class</th>
+                          <th className="py-2.5 pr-4">Sessions</th>
+                          <th className="py-2.5 pr-4">Present / Total</th>
+                          <th className="py-2.5">%</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedFaculty.classStats.map(row => (
+                          <tr key={row.classId} className="border-b last:border-0">
+                            <td className="py-2.5 pr-4">{row.className}</td>
+                            <td className="py-2.5 pr-4">{row.sessions}</td>
+                            <td className="py-2.5 pr-4">{row.present}/{row.total}</td>
+                            <td className="py-2.5 font-semibold">{row.pct}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
-      <Card>
-        <CardHeader><CardTitle className="text-base">Class Summary</CardTitle></CardHeader>
-        <CardContent>
-          {summaryRows.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No class summary available yet.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="text-left border-b text-muted-foreground">
-                  <tr>
-                    <th className="py-2.5 pr-4">Class</th>
-                    <th className="py-2.5 pr-4">Students</th>
-                    <th className="py-2.5 pr-4">Avg %</th>
-                    <th className="py-2.5 pr-4">Safe</th>
-                    <th className="py-2.5 pr-4">Moderate</th>
-                    <th className="py-2.5">High</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {summaryRows.map(row => (
-                    <tr key={row.id} className="border-b last:border-0">
-                      <td className="py-2.5 pr-4 font-medium">{row.name}</td>
-                      <td className="py-2.5 pr-4">{row.students}</td>
-                      <td className="py-2.5 pr-4 font-semibold">{row.avgPct}%</td>
-                      <td className="py-2.5 pr-4 text-success">{row.safe}</td>
-                      <td className="py-2.5 pr-4 text-warning">{row.moderate}</td>
-                      <td className="py-2.5 text-danger">{row.high}</td>
-                    </tr>
+            <Card>
+              <CardHeader><CardTitle className="text-base">Subject-wise Stats</CardTitle></CardHeader>
+              <CardContent>
+                {!selectedFaculty || selectedFaculty.subjectStats.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No subject stats for selected faculty.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="text-left border-b text-muted-foreground">
+                        <tr>
+                          <th className="py-2.5 pr-4">Subject</th>
+                          <th className="py-2.5 pr-4">Sessions</th>
+                          <th className="py-2.5 pr-4">Present / Total</th>
+                          <th className="py-2.5">%</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedFaculty.subjectStats.map(row => (
+                          <tr key={row.subjectId} className="border-b last:border-0">
+                            <td className="py-2.5 pr-4">{row.subjectName}</td>
+                            <td className="py-2.5 pr-4">{row.sessions}</td>
+                            <td className="py-2.5 pr-4">{row.present}/{row.total}</td>
+                            <td className="py-2.5 font-semibold">{row.pct}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="class">
+          <div className="mb-4 max-w-sm">
+            <Label>Select Class</Label>
+            <Select value={selectedClassId} onValueChange={setSelectedClassId}>
+              <SelectTrigger><SelectValue placeholder="Choose class" /></SelectTrigger>
+              <SelectContent>
+                {summaryRows.map(row => (
+                  <SelectItem key={row.id} value={row.id}>{row.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader><CardTitle className="text-base">Safe Students</CardTitle></CardHeader>
+              <CardContent>
+                <div className="space-y-1 text-sm max-h-56 overflow-y-auto">
+                  {safeStudents.length === 0 ? (
+                    <p className="text-muted-foreground">No safe students.</p>
+                  ) : safeStudents.map(row => (
+                    <p key={row.id}>{row.rollNumber} - {row.name}</p>
                   ))}
-                </tbody>
-              </table>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-base">Risk Students</CardTitle></CardHeader>
+              <CardContent>
+                <div className="space-y-1 text-sm max-h-56 overflow-y-auto">
+                  {riskStudents.length === 0 ? (
+                    <p className="text-muted-foreground">No risk students.</p>
+                  ) : riskStudents.map(row => (
+                    <p key={row.id}>{row.rollNumber} - {row.name}</p>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="subject">
+          <Card>
+            <CardHeader><CardTitle className="text-base">Subject Summary</CardTitle></CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="text-left border-b text-muted-foreground">
+                    <tr>
+                      <th className="py-2.5 pr-4">Subject</th>
+                      <th className="py-2.5">%</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {subjectRows.map(row => (
+                      <tr key={row.id} className="border-b last:border-0">
+                        <td className="py-2.5 pr-4">{row.name}</td>
+                        <td className="py-2.5 font-semibold">{row.pct}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="defaulters">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div className="space-y-2">
+              <Label>Select Class</Label>
+              <Select value={selectedClassId} onValueChange={setSelectedClassId}>
+                <SelectTrigger><SelectValue placeholder="Choose class" /></SelectTrigger>
+                <SelectContent>
+                  {summaryRows.map(row => (
+                    <SelectItem key={row.id} value={row.id}>{row.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          )}
-        </CardContent>
-      </Card>
+            <div className="md:col-span-2 flex items-end justify-end">
+              <Button variant="outline" onClick={downloadDefaultersPdf}>Download Defaulter List PDF</Button>
+            </div>
+          </div>
+
+          <Card>
+            <CardHeader><CardTitle className="text-base">Defaulter Students (Attendance &lt; 75%)</CardTitle></CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="text-left border-b text-muted-foreground">
+                    <tr>
+                      <th className="py-2.5 pr-4">Roll No</th>
+                      <th className="py-2.5 pr-4">Name</th>
+                      <th className="py-2.5 pr-4">Present / Total</th>
+                      <th className="py-2.5 pr-4">%</th>
+                      <th className="py-2.5">Risk</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {defaulterRows.map(row => (
+                      <tr key={row.studentId} className="border-b last:border-0">
+                        <td className="py-2.5 pr-4">{row.rollNumber}</td>
+                        <td className="py-2.5 pr-4">{row.studentName}</td>
+                        <td className="py-2.5 pr-4">{row.present}/{row.total}</td>
+                        <td className="py-2.5 pr-4 font-semibold">{row.pct}%</td>
+                        <td className="py-2.5"><RiskBadge level={row.riskLevel} /></td>
+                      </tr>
+                    ))}
+                    {defaulterRows.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="py-4 text-center text-muted-foreground text-sm">
+                          No defaulters for the selected class and date range.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

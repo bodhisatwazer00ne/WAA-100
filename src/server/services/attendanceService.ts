@@ -54,11 +54,21 @@ function getRiskCategory(subjectPct: number): 'safe' | 'moderate' | 'high' {
 }
 
 function resolveStudentEmail(name: string, email?: string | null): string | null {
+  const allowedEmails = new Set([
+    'theyellowflashlegend@gmail.com',
+    'madlad.howdoyoufeelnow@gmail.com',
+    'bodhisatwa.zerone@gmail.com',
+  ]);
   const normalized = name.trim().toLowerCase();
   if (normalized === 'harry james potter') return 'theyellowflashlegend@gmail.com';
   if (normalized === 'steven grant rogers') return 'madlad.howdoyoufeelnow@gmail.com';
   if (normalized === 'natasha alianovna romanoff') return 'bodhisatwa.zerone@gmail.com';
-  return email ?? null;
+  const normalizedEmail = (email ?? '').trim().toLowerCase();
+  if (normalizedEmail === 'harry.potter@student.edu') return 'theyellowflashlegend@gmail.com';
+  if (normalizedEmail === 'steven.rogers@student.edu') return 'madlad.howdoyoufeelnow@gmail.com';
+  if (normalizedEmail === 'natasha.romanoff@student.edu') return 'bodhisatwa.zerone@gmail.com';
+  if (allowedEmails.has(normalizedEmail)) return normalizedEmail;
+  return null;
 }
 
 export async function markAttendance({
