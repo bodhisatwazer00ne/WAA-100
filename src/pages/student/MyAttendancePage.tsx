@@ -91,7 +91,7 @@ export default function MyAttendancePage() {
       </div>
 
       <div className="flex items-center gap-3 mb-6">
-        <span className="text-4xl font-bold">{analytics.overallPct}%</span>
+        <span className="text-4xl font-bold">{Math.round(analytics.overallPct)}%</span>
         <RiskBadge level={analytics.riskLevel} />
       </div>
 
@@ -120,14 +120,14 @@ export default function MyAttendancePage() {
                   <div className="flex justify-between text-sm mb-1">
                     <span className="font-medium">{sw.subjectName}</span>
                     <span className={`font-semibold ${sw.pct >= 85 ? 'text-success' : sw.pct >= 75 ? 'text-warning' : 'text-danger'}`}>
-                      {sw.pct}%
+                      {Math.round(sw.pct)}%
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
                       <div
                         className={`h-full rounded-full ${sw.pct >= 85 ? 'bg-success' : sw.pct >= 75 ? 'bg-warning' : 'bg-danger'}`}
-                        style={{ width: `${sw.pct}%` }}
+                        style={{ width: `${Math.round(sw.pct)}%` }}
                       />
                     </div>
                     <span className="text-xs text-muted-foreground w-16 text-right">{sw.attended}/{sw.total}</span>
@@ -177,5 +177,6 @@ export default function MyAttendancePage() {
     </div>
   );
 }
+
 
 

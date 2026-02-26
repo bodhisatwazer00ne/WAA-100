@@ -203,9 +203,9 @@ function StudentDashboard({ studentProfileId }: { studentProfileId?: string }) {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard title="Overall Attendance" value={`${analytics.overallPct}%`} icon={ClipboardCheck} />
+        <StatCard title="Overall Attendance" value={`${Math.round(analytics.overallPct)}%`} icon={ClipboardCheck} />
         <StatCard title="Risk Status" value={analytics.riskLevel.toUpperCase()} icon={AlertTriangle} />
-        <StatCard title="Weekly Average" value={`${analytics.weeklyAvg}%`} icon={TrendingUp} />
+        <StatCard title="Weekly Average" value={`${Math.round(analytics.weeklyAvg)}%`} icon={TrendingUp} />
         <StatCard title="Subjects" value={analytics.subjectWise.length} icon={BookOpen} />
       </div>
 
@@ -237,10 +237,10 @@ function StudentDashboard({ studentProfileId }: { studentProfileId?: string }) {
                 <div key={subject.subjectId}>
                   <div className="flex justify-between text-sm mb-1">
                     <span>{subject.subjectName}</span>
-                    <span className="font-semibold">{subject.pct}%</span>
+                    <span className="font-semibold">{Math.round(subject.pct)}%</span>
                   </div>
                   <div className="h-2 bg-muted rounded-full overflow-hidden">
-                    <div className="h-full bg-primary rounded-full" style={{ width: `${subject.pct}%` }} />
+                    <div className="h-full bg-primary rounded-full" style={{ width: `${Math.round(subject.pct)}%` }} />
                   </div>
                 </div>
               ))}
@@ -835,4 +835,5 @@ function HodDashboard() {
     </div>
   );
 }
+
 

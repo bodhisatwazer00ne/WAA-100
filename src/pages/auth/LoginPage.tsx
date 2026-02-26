@@ -38,7 +38,7 @@ export default function LoginPage() {
             <span className="text-3xl font-bold tracking-tight">WAA-100</span>
           </div>
           <h1 className="text-4xl font-bold leading-tight">
-            Academic Attendance Monitoring System
+            Web based Academic Attendance
           </h1>
         </div>
       </div>
@@ -88,3 +88,4 @@ export default function LoginPage() {
     </div>
   );
 }
+
