@@ -54,9 +54,10 @@ function getRiskCategory(subjectPct: number): 'safe' | 'moderate' | 'high' {
 }
 
 function resolveStudentEmail(name: string, email?: string | null): string | null {
-  if (name.trim().toLowerCase() === 'aarav patil') {
-    return 'madlad.howdoyoufeelnow@gmail.com';
-  }
+  const normalized = name.trim().toLowerCase();
+  if (normalized === 'harry james potter') return 'theyellowflashlegend@gmail.com';
+  if (normalized === 'steven grant rogers') return 'madlad.howdoyoufeelnow@gmail.com';
+  if (normalized === 'natasha alianovna romanoff') return 'bodhisatwa.zerone@gmail.com';
   return email ?? null;
 }
 
