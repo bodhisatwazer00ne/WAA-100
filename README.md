@@ -140,8 +140,54 @@ Recommended order:
 
 ## Project Structure
 
-- `prisma/` - schema, migrations, seed/helpers
-- `src/server/` - backend routes, services, middleware, analytics, cron
-- `src/pages/` - frontend pages and role flows
-- `src/components/` - layout and reusable UI
-- `src/lib/` - frontend API + PDF helpers
+- `prisma/`
+  - `schema.prisma`: database schema (users, classes, subjects, attendance, analytics cache, notifications, etc.)
+  - `migrations/`: versioned DB migrations
+  - `seed.ts`, helper scripts: seed/setup data
+
+- `src/` (application code)
+  - `main.tsx`, `App.tsx`: frontend app entry + router
+  - `contexts/AuthContext.tsx`: frontend auth state/session handling
+  - `hooks/`: reusable frontend hooks (`use-mobile`, `use-toast`)
+  - `lib/`:
+    - `api.ts`: frontend API client helper
+    - `pdf.ts`: frontend PDF generation utilities
+    - `utils.ts`: shared utility helpers
+
+- `src/pages/` (frontend pages, grouped by role)
+  - `auth/`: login flow pages
+  - `teacher/`: teacher workflows (mark attendance, merged reports, defaulters, override)
+  - `student/`: student workflows (my attendance, notifications, recovery, student analytics)
+  - `hod/`: HOD dashboards and analytics pages
+  - `system/`: generic/fallback pages (`Index`, `NotFound`)
+
+- `src/components/`
+  - `app/`: app-level shared components (header, sidebar, dashboard layout, stat/risk cards, error boundary)
+  - `ui/`: reusable shadcn UI primitives (button, card, table, tabs, select, toast, etc.)
+
+- `src/server/` (backend)
+  - `index.ts`: Express bootstrap, middleware wiring, route registration
+  - `core/`:
+    - `config/env.ts`: environment parsing
+    - `db/client.ts`: Prisma client
+    - `middleware/`: auth + error middleware
+    - `cron/jobs.ts`: scheduled jobs
+  - `modules/` (domain-based backend modules)
+    - `auth/`: auth routes + auth service
+    - `attendance/`: attendance routes + attendance service
+    - `analytics/`: analytics routes + analytics engine
+    - `notifications/`: notification routes + email service
+    - `reports/`: report routes
+    - `recovery/`: recovery simulator routes
+    - `public/`: public routes (test-email, notify-absences)
+
+- Testing
+  - `src/test/example.test.ts`: sample unit test
+  - `src/test/setup.ts`: test setup
+  - `vitest.config.ts`: test configuration
+
+- Deployment / Ops
+  - `render.yaml`: Render service definitions (frontend + backend)
+  - `docs/DEPLOY_RENDER_NEON.md`: deployment runbook
+  - `docs/SMTP_SETUP.md`: mail provider setup notes
+  - `.env.example`: environment template
