@@ -22,16 +22,16 @@ function resolveEmail(studentName: string, email: string) {
   const allowedEmails = new Set([
     'theyellowflashlegend@gmail.com',
     'madlad.howdoyoufeelnow@gmail.com',
-    'bodhisatwa.zerone@gmail.com',
+    'bodhisatwa.zeroone@gmail.com',
   ]);
   const normalized = studentName.trim().toLowerCase();
   if (normalized === 'harry james potter') return 'theyellowflashlegend@gmail.com';
   if (normalized === 'steven grant rogers') return 'madlad.howdoyoufeelnow@gmail.com';
-  if (normalized === 'natasha alianovna romanoff') return 'bodhisatwa.zerone@gmail.com';
+  if (normalized === 'natasha alianovna romanoff') return 'bodhisatwa.zeroone@gmail.com';
   const normalizedEmail = email.trim().toLowerCase();
   if (normalizedEmail === 'harry.potter@student.edu') return 'theyellowflashlegend@gmail.com';
   if (normalizedEmail === 'steven.rogers@student.edu') return 'madlad.howdoyoufeelnow@gmail.com';
-  if (normalizedEmail === 'natasha.romanoff@student.edu') return 'bodhisatwa.zerone@gmail.com';
+  if (normalizedEmail === 'natasha.romanoff@student.edu') return 'bodhisatwa.zeroone@gmail.com';
   if (allowedEmails.has(normalizedEmail)) return normalizedEmail;
   return '';
 }

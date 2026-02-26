@@ -483,8 +483,16 @@ function HodDashboard() {
   }, [selectedClassId, startDate, endDate]);
 
   const selectedFaculty = facultyRows.find(row => row.teacherId === selectedFacultyId) ?? null;
+  const selectedClassSummary = summaryRows.find(row => row.id === selectedClassId) ?? null;
   const safeStudents = classStudentRows.filter(row => row.riskLevel === 'safe');
   const riskStudents = classStudentRows.filter(row => row.riskLevel !== 'safe');
+  const classRiskData = selectedClassSummary
+    ? [
+        { name: 'Safe', value: selectedClassSummary.safe, color: RISK_COLORS.safe },
+        { name: 'Moderate', value: selectedClassSummary.moderate, color: RISK_COLORS.moderate },
+        { name: 'High', value: selectedClassSummary.high, color: RISK_COLORS.high },
+      ]
+    : [];
 
   const downloadDefaultersPdf = () => {
     const className = summaryRows.find(row => row.id === selectedClassId)?.name ?? selectedClassId;
@@ -544,6 +552,40 @@ function HodDashboard() {
               </SelectContent>
             </Select>
           </div>
+
+          {selectedFaculty && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              <Card>
+                <CardHeader><CardTitle className="text-base">Class-wise % Graph</CardTitle></CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={260}>
+                    <BarChart data={selectedFaculty.classStats.map(row => ({ name: row.className, pct: row.pct }))}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(214, 20%, 88%)" />
+                      <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                      <YAxis domain={[0, 100]} />
+                      <Tooltip />
+                      <Bar dataKey="pct" name="Attendance %" fill="hsl(220, 60%, 20%)" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader><CardTitle className="text-base">Subject-wise % Graph</CardTitle></CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={260}>
+                    <BarChart data={selectedFaculty.subjectStats.map(row => ({ name: row.subjectName, pct: row.pct }))}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(214, 20%, 88%)" />
+                      <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                      <YAxis domain={[0, 100]} />
+                      <Tooltip />
+                      <Bar dataKey="pct" name="Attendance %" fill="hsl(175, 55%, 40%)" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
@@ -625,6 +667,27 @@ function HodDashboard() {
             </Select>
           </div>
 
+          <Card className="mb-6">
+            <CardHeader><CardTitle className="text-base">Class Risk Distribution</CardTitle></CardHeader>
+            <CardContent>
+              {!selectedClassSummary ? (
+                <p className="text-sm text-muted-foreground">Select a class to view risk chart.</p>
+              ) : (
+                <ResponsiveContainer width="100%" height={260}>
+                  <PieChart>
+                    <Pie data={classRiskData} cx="50%" cy="50%" outerRadius={85} dataKey="value" label>
+                      {classRiskData.map(item => (
+                        <Cell key={item.name} fill={item.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader><CardTitle className="text-base">Safe Students</CardTitle></CardHeader>
@@ -654,6 +717,21 @@ function HodDashboard() {
         </TabsContent>
 
         <TabsContent value="subject">
+          <Card className="mb-6">
+            <CardHeader><CardTitle className="text-base">Subject-wise % Graph</CardTitle></CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart data={subjectRows.map(row => ({ name: row.code, pct: row.pct }))}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(214, 20%, 88%)" />
+                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                  <YAxis domain={[0, 100]} />
+                  <Tooltip />
+                  <Bar dataKey="pct" name="Attendance %" fill="hsl(220, 60%, 20%)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader><CardTitle className="text-base">Subject Summary</CardTitle></CardHeader>
             <CardContent>
@@ -696,6 +774,25 @@ function HodDashboard() {
               <Button variant="outline" onClick={downloadDefaultersPdf}>Download Defaulter List PDF</Button>
             </div>
           </div>
+
+          <Card className="mb-6">
+            <CardHeader><CardTitle className="text-base">Defaulter Attendance %</CardTitle></CardHeader>
+            <CardContent>
+              {defaulterRows.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No defaulter graph data for the selected filters.</p>
+              ) : (
+                <ResponsiveContainer width="100%" height={280}>
+                  <BarChart data={defaulterRows.map(row => ({ name: row.rollNumber, pct: row.pct }))}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(214, 20%, 88%)" />
+                    <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                    <YAxis domain={[0, 100]} />
+                    <Tooltip />
+                    <Bar dataKey="pct" name="Attendance %" fill="hsl(355, 78%, 58%)" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader><CardTitle className="text-base">Defaulter Students (Attendance &lt; 75%)</CardTitle></CardHeader>

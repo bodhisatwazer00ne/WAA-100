@@ -73,7 +73,7 @@
 
 - Harry James Potter (SYCSE A): `theyellowflashlegend@gmail.com`
 - Steven Grant Rogers (TYCSE A): `madlad.howdoyoufeelnow@gmail.com`
-- Natasha Alianovna Romanoff (TYCSE A): `bodhisatwa.zerone@gmail.com`
+- Natasha Alianovna Romanoff (TYCSE A): `bodhisatwa.zeroone@gmail.com`
 
 ## Faculty Assignment Map
 
