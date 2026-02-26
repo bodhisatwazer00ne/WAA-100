@@ -1,87 +1,147 @@
-# WAA-100 - Web-based Academic Attendance Monitoring
+# WAA-100
 
-WAA-100 is a full-stack attendance platform with role-based dashboards for **HOD**, **Teacher**, and **Student**, including attendance marking, date/range analytics, defaulter views, PDF exports, and absence email alerts.
+WAA-100 is a full-stack academic attendance system with role-based access for:
+- HOD
+- Teacher
+- Student
+
+It supports attendance marking, analytics dashboards, defaulter workflows, PDF exports, and absence email notifications.
 
 ## Tech Stack
 
-- **Frontend**: Vite + React + TypeScript + shadcn-ui + Tailwind CSS
-- **Backend**: Node.js + Express (TypeScript)
-- **Database**: PostgreSQL + Prisma ORM
-- **Auth**: JWT + bcrypt
-- **Scheduling**: node-cron
-- **Email**: Mailgun API (primary) + Nodemailer SMTP fallback
-- **PDF**:
-  - Frontend table/matrix PDFs via `src/lib/pdf.ts`
-  - Backend PDF endpoint (`src/server/routes/reportRoutes.ts`) uses `pdfkit`
+- Frontend: Vite + React + TypeScript + Tailwind + shadcn/ui
+- Backend: Node.js + Express (TypeScript)
+- Database: PostgreSQL (Neon compatible) + Prisma ORM
+- Auth: JWT + bcrypt
+- Scheduler: node-cron
+- Charts: Recharts
+- PDFs: frontend PDF table utilities + backend pdfkit route
+- Email: Mailgun API (primary) with SMTP fallback support in code
 
-## Prerequisites
+## Current Architecture
 
-- Node.js 18+
-- PostgreSQL (local or managed, e.g. Neon)
+- Frontend and backend are separate services.
+- Frontend calls backend via `VITE_API_BASE_URL`.
+- Backend uses `DATABASE_URL` (Neon recommended in deployment).
+- Frontend routing uses `HashRouter` (`#/...`) for safer static hosting behavior.
 
-## Local Setup
+## Features
 
-### 1) Environment
+### Teacher
+- Mark attendance by class + subject + date
+- Date visible at top while marking
+- Re-open existing day and download day PDF
+- Defaulter list by selected class/subject
+- "Your Class's Report" (for class teachers) with date/date-range analytics and PDFs
 
-Create `.env` from `.env.example` and fill required values:
+### HOD
+- Dashboard tabs:
+  - Faculty Wise Stats
+  - Class Wise Stats
+  - Subject Wise Stats
+  - Defaulter List
+- Graphs added for faculty/class/subject/defaulter views
+- Faculty mapping view (`/reports/faculty`)
 
+### Student
+- My attendance view
+- Dashboard with subject-wise and trend analytics
+- Recovery simulator
+
+## Email Delivery Notes (Important)
+
+- Mailgun sandbox only sends to **authorized recipients**.
+- This project currently has an allowlist in backend code for sandbox safety.
+- If an email is not authorized in Mailgun sandbox, provider will reject with `403`.
+
+## Environment Variables
+
+Create local `.env` from `.env.example` and fill values.
+
+### Required backend vars
 - `DATABASE_URL`
 - `JWT_SECRET`
-- `MAILGUN_API_KEY`, `MAILGUN_DOMAIN`, `MAILGUN_FROM` for email delivery (recommended)
+- `JWT_EXPIRES_IN` (e.g. `7d`)
+- `APP_BASE_URL` (frontend origin)
 
-### 2) Install
+### Mailgun (recommended)
+- `MAILGUN_API_KEY`
+- `MAILGUN_DOMAIN`
+- `MAILGUN_FROM`
+- `MAILGUN_API_BASE_URL` (default `https://api.mailgun.net`)
 
-```sh
+### SMTP fallback (optional)
+- `SMTP_URL` or `SMTP_SERVICE`/`SMTP_HOST` + auth vars
+- `SMTP_USER`
+- `SMTP_PASS`
+- `SMTP_FROM`
+- `SMTP_REQUIRE_TLS`
+
+### Frontend var (build-time)
+- `VITE_API_BASE_URL` = backend public URL (e.g. `https://<backend>.onrender.com`)
+
+## Local Development
+
+### 1) Install
+```bash
 npm install
 ```
 
-### 3) Prisma
-
-```sh
-npx prisma migrate dev --name init
+### 2) Prisma
+```bash
 npx prisma generate
+npx prisma migrate dev --name init
 ```
 
 Optional seed:
-
-```sh
-npx ts-node prisma/seed.ts
+```bash
+npm run prisma:seed
 ```
 
-Use the currently maintained credentials in `LOGIN_CREDENTIALS.md`.
-
-### 4) Run app
-
-Backend:
-
-```sh
+### 3) Start backend
+```bash
 npm run server:dev
 ```
+Backend default: `http://localhost:4000`
 
-Frontend:
-
-```sh
+### 4) Start frontend
+```bash
 npm run dev
 ```
+Frontend default from config: `http://localhost:8080`
 
-Default URLs:
-
-- Backend: `http://localhost:4000`
-- Frontend: `http://localhost:8080` (from `vite.config.ts`)
-
-If you prefer `5173`:
-
-```sh
+Optional custom dev port:
+```bash
 npm run dev -- --host 127.0.0.1 --port 5173
 ```
 
+## Build Commands
 
-## Key Project Structure
+- Frontend build: `npm run build`
+- Backend build: `npm run server:build`
+- Backend prod start (after build): `npm run server:start`
+- Fullstack local dev: `npm run start:fullstack`
 
-- `prisma/schema.prisma`: DB schema
-- `src/server/index.ts`: backend bootstrap
-- `src/server/routes/*`: auth, attendance, analytics, notifications, reports, recovery, public mail routes
-- `src/server/services/*`: auth, attendance, email services
-- `src/server/cron/jobs.ts`: scheduled jobs
-- `src/pages/*`: role-based dashboard and workflow pages
-- `src/lib/pdf.ts`: frontend PDF generation utilities
+## Deployment (Render + Neon)
+
+Use:
+- `DEPLOY_RENDER_NEON.md`
+- `render.yaml`
+
+Recommended order:
+1. Deploy backend web service (with backend env vars)
+2. Verify backend health: `/api/health`
+3. Deploy frontend static site with `VITE_API_BASE_URL` pointing to backend
+
+## Credentials
+
+- Active login credentials are maintained in:
+  - `LOGIN_CREDENTIALS.md`
+
+## Project Structure
+
+- `prisma/` - schema, migrations, seed/helpers
+- `src/server/` - backend routes, services, middleware, analytics, cron
+- `src/pages/` - frontend pages and role flows
+- `src/components/` - layout and reusable UI
+- `src/lib/` - frontend API + PDF helpers
