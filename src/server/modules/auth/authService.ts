@@ -1,7 +1,7 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { prisma } from '../db/client.js';
-import { env } from '../config/env.js';
+import { prisma } from '../../core/db/client.js';
+import { env } from '../../core/config/env.js';
 import type { Role } from '@prisma/client';
 import type { SignOptions } from 'jsonwebtoken';
 
@@ -19,4 +19,5 @@ export function generateToken(userId: string, role: Role) {
   };
   return jwt.sign({ userId, role }, env.jwtSecret, signOptions);
 }
+
 

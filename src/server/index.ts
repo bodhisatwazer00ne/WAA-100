@@ -1,16 +1,16 @@
 import express from 'express';
 import cors from 'cors';
-import { env } from './config/env.js';
-import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
-import authRoutes from './routes/authRoutes.js';
-import attendanceRoutes from './routes/attendanceRoutes.js';
-import analyticsRoutes from './routes/analyticsRoutes.js';
-import notificationRoutes from './routes/notificationRoutes.js';
-import reportRoutes from './routes/reportRoutes.js';
-import recoveryRoutes from './routes/recoveryRoutes.js';
-import publicRoutes from './routes/publicRoutes.js';
-import { startCronJobs } from './cron/jobs.js';
-import { verifyEmailConnection } from './services/emailService.js';
+import { env } from './core/config/env.js';
+import { notFoundHandler, errorHandler } from './core/middleware/errorHandler.js';
+import authRoutes from './modules/auth/authRoutes.js';
+import attendanceRoutes from './modules/attendance/attendanceRoutes.js';
+import analyticsRoutes from './modules/analytics/analyticsRoutes.js';
+import notificationRoutes from './modules/notifications/notificationRoutes.js';
+import reportRoutes from './modules/reports/reportRoutes.js';
+import recoveryRoutes from './modules/recovery/recoveryRoutes.js';
+import publicRoutes from './modules/public/publicRoutes.js';
+import { startCronJobs } from './core/cron/jobs.js';
+import { verifyEmailConnection } from './modules/notifications/emailService.js';
 
 const app = express();
 
@@ -48,4 +48,5 @@ app.listen(env.port, () => {
   });
   startCronJobs();
 });
+
 

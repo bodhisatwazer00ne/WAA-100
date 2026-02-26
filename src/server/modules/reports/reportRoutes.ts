@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { authMiddleware, requireRole } from '../middleware/auth.js';
-import { prisma } from '../db/client.js';
+import { authMiddleware, requireRole } from '../../core/middleware/auth.js';
+import { prisma } from '../../core/db/client.js';
 import PDFDocument from 'pdfkit';
 import type { Role } from '@prisma/client';
 
@@ -480,5 +480,6 @@ router.get('/class/:classId/merged/:reportId/pdf', requireRole('teacher', 'class
 });
 
 export default router;
+
 
 

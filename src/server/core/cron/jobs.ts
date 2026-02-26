@@ -1,10 +1,10 @@
 import cron from 'node-cron';
-import { prisma } from '../db/client.js';
-import { recomputeAllStudentsAnalytics } from '../analytics/analyticsEngine.js';
+import { prisma } from '../../core/db/client.js';
+import { recomputeAllStudentsAnalytics } from '../../modules/analytics/analyticsEngine.js';
 import PDFDocument from 'pdfkit';
 import fs from 'fs';
 import path from 'path';
-import { sendEmail } from '../services/emailService.js';
+import { sendEmail } from '../../modules/notifications/emailService.js';
 
 function ensureReportsDir() {
   const dir = path.join(process.cwd(), 'reports');
@@ -88,5 +88,6 @@ export function startCronJobs() {
     await recomputeAllStudentsAnalytics();
   });
 }
+
 
 

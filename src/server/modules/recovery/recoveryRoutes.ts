@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { authMiddleware } from '../middleware/auth.js';
-import { prisma } from '../db/client.js';
+import { authMiddleware } from '../../core/middleware/auth.js';
+import { prisma } from '../../core/db/client.js';
 
 const router = Router();
 
@@ -48,5 +48,6 @@ router.get('/student/:studentId', async (req, res) => {
 });
 
 export default router;
+
 
 

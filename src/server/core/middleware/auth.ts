@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { env } from '../config/env.js';
+import { env } from '../../core/config/env.js';
 import type { Role } from '@prisma/client';
 
 export interface AuthPayload {
@@ -43,5 +43,6 @@ export function requireRole(...roles: Role[]) {
     return next();
   };
 }
+
 
 

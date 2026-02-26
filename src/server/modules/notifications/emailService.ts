@@ -1,5 +1,5 @@
 import nodemailer from 'nodemailer';
-import { env } from '../config/env.js';
+import { env } from '../../core/config/env.js';
 
 const mailgunApiBase = env.mailgun.apiBaseUrl.replace(/\/+$/, '');
 const mailgunEndpoint = `${mailgunApiBase}/v3/${env.mailgun.domain}/messages`;
@@ -195,4 +195,5 @@ export async function verifyEmailConnection() {
     return { ok: false as const, provider: 'smtp' as const, reason: String(error) };
   }
 }
+
 

@@ -1,5 +1,5 @@
-import { prisma } from '../db/client.js';
-import { sendEmail } from './emailService.js';
+import { prisma } from '../../core/db/client.js';
+import { sendEmail } from '../notifications/emailService.js';
 import type { Prisma, Role } from '@prisma/client';
 
 export async function getTeacherSubjects(teacherUserId: string) {
@@ -208,4 +208,5 @@ export function ensureRole(role: Role, allowed: Role[]) {
     throw new Error('Forbidden');
   }
 }
+
 

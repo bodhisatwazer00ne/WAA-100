@@ -1,15 +1,15 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { authMiddleware } from '../middleware/auth.js';
+import { authMiddleware } from '../../core/middleware/auth.js';
 import {
   getTeacherSubjects,
   getTeacherClassesForSubject,
   getStudentsByClass,
   hasAttendanceForDate,
   markAttendance,
-} from '../services/attendanceService.js';
+} from './attendanceService.js';
 import { recomputeStudentAnalytics } from '../analytics/analyticsEngine.js';
-import { prisma } from '../db/client.js';
+import { prisma } from '../../core/db/client.js';
 
 const router = Router();
 
@@ -256,4 +256,5 @@ router.post('/attendance/override', async (req, res) => {
 });
 
 export default router;
+
 

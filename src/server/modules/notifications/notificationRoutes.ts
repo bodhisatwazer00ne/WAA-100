@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { authMiddleware, requireRole } from '../middleware/auth.js';
-import { prisma } from '../db/client.js';
+import { authMiddleware, requireRole } from '../../core/middleware/auth.js';
+import { prisma } from '../../core/db/client.js';
 
 const router = Router();
 
@@ -46,5 +46,6 @@ router.get('/all', requireRole('hod', 'class_teacher'), async (_req, res) => {
 });
 
 export default router;
+
 
 
