@@ -48,7 +48,7 @@ It supports attendance marking, analytics dashboards, defaulter workflows, PDF e
 - Dashboard with subject-wise and trend analytics
 - Recovery simulator
 
-## Email Delivery Notes (Important)
+## Email Delivery Notes 
 
 - Mailgun sandbox only sends to **authorized recipients**.
 - This project currently has an allowlist in backend code for sandbox safety.
@@ -64,18 +64,13 @@ Create local `.env` from `.env.example` and fill values.
 - `JWT_EXPIRES_IN` (e.g. `7d`)
 - `APP_BASE_URL` (frontend origin)
 
-### Mailgun (recommended)
+### Mailgun 
 - `MAILGUN_API_KEY`
 - `MAILGUN_DOMAIN`
 - `MAILGUN_FROM`
 - `MAILGUN_API_BASE_URL` (default `https://api.mailgun.net`)
 
-### SMTP fallback (optional)
-- `SMTP_URL` or `SMTP_SERVICE`/`SMTP_HOST` + auth vars
-- `SMTP_USER`
-- `SMTP_PASS`
-- `SMTP_FROM`
-- `SMTP_REQUIRE_TLS`
+
 
 ### Frontend var (build-time)
 - `VITE_API_BASE_URL` = backend public URL (e.g. `https://<backend>.onrender.com`)
